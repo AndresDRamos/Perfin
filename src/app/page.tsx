@@ -26,9 +26,14 @@ export default async function Home() {
     <main className="mx-auto max-w-2xl p-8 space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Perfin</h1>
-        <a href="/categories" className="text-sm text-blue-600 hover:underline">
-          Categorías →
-        </a>
+        <nav className="flex gap-4 text-sm text-blue-600">
+          <a href="/plans" className="hover:underline">
+            Planes →
+          </a>
+          <a href="/categories" className="hover:underline">
+            Categorías →
+          </a>
+        </nav>
       </div>
 
       {/* ── Dashboard ── */}
