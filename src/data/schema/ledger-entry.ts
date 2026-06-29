@@ -9,6 +9,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { account } from "./account";
+import { incomeCategory } from "./income-category";
+import { expenseCategory } from "./expense-category";
 
 export const ledgerEntryKindEnum = pgEnum("ledger_entry_kind", [
   "income",
@@ -42,6 +44,10 @@ export const ledgerEntry = pgTable(
       .references(() => account.id),
     // Destination account for internal transfers only. NULL for income/expense.
     toAccountId: integer("to_account_id").references(() => account.id),
+    // Category FKs: only one is ever populated; the other is NULL.
+    // chk_category_kind enforces which column matches the entry's kind.
+    incomeCategoryId: integer("income_category_id").references(() => incomeCategory.id),
+    expenseCategoryId: integer("expense_category_id").references(() => expenseCategory.id),
   },
   (t) => [
     // Amount must always be a meaningful positive value
@@ -65,6 +71,21 @@ export const ledgerEntry = pgTable(
     index("idx_ledger_entry_to_account")
       .on(t.toAccountId)
       .where(sql`${t.toAccountId} IS NOT NULL`),
+    // income_category_id is only valid for income; expense_category_id for expense; transfer forbids both
+    check(
+      "chk_category_kind",
+      sql`
+        (${t.kind} = 'income' AND ${t.expenseCategoryId} IS NULL)
+        OR (${t.kind} = 'expense' AND ${t.incomeCategoryId} IS NULL)
+        OR (${t.kind} = 'transfer' AND ${t.incomeCategoryId} IS NULL AND ${t.expenseCategoryId} IS NULL)
+      `
+    ),
+    index("idx_ledger_entry_income_category")
+      .on(t.incomeCategoryId)
+      .where(sql`${t.incomeCategoryId} IS NOT NULL`),
+    index("idx_ledger_entry_expense_category")
+      .on(t.expenseCategoryId)
+      .where(sql`${t.expenseCategoryId} IS NOT NULL`),
   ]
 );
 
