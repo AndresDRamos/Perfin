@@ -1,7 +1,7 @@
 # Module: catalog
 
 - Type: catalog
-- Status: planned
+- Status: building (0003 — categories + ledger link)
 
 ## Purpose
 
@@ -10,10 +10,30 @@ category) and **fixed expenses** (recurring monthly transactions carrying a subt
 
 ## Key entities / tables
 
-<!-- schema-derived: none of these tables exist in the live schema yet (as of 0000_strong_smasher); design below is planned. -->
+<!-- schema-derived: generated from live schema as of 0001_loving_jubilee (2026-06-29) -->
 
-- `income_category` / `expense_category` (id, name, description). One reserved `savings` category used in budgeting that accumulates into a designated savings account.
-- `fixed_expense` (id, name, amount, subtype, recurrence, next_due, target_account_id, expense_category_id?). Subtype: `subscription` | `service`.
+**`income_category`**
+
+| Column | Type | Nullable | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `id` | integer | NO | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `name` | varchar(100) | NO | | Case-insensitive unique (`lower(name)`). |
+| `description` | varchar(300) | YES | | |
+| `is_active` | boolean | NO | `true` | Partial index on active rows. |
+| `created_at` | timestamptz | NO | `now()` | |
+
+**`expense_category`**
+
+| Column | Type | Nullable | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `id` | integer | NO | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `name` | varchar(100) | NO | | Case-insensitive unique (`lower(name)`). |
+| `description` | varchar(300) | YES | | |
+| `is_savings` | boolean | NO | `false` | At most one row may be `true` (singleton partial unique index). Reserved "Ahorro" row seeded. |
+| `is_active` | boolean | NO | `true` | Partial index on active rows. |
+| `created_at` | timestamptz | NO | `now()` | |
+
+- `fixed_expense` — not yet in the live schema; design is planned (see module purpose above).
 
 ## Public interface
 

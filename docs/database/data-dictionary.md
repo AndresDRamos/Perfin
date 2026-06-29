@@ -47,10 +47,58 @@ Indexes:
 - `account_pkey` — UNIQUE btree (`id`).
 - `idx_account_is_active` — btree (`is_active`) WHERE `is_active = true`.
 
+## Table: `expense_category`
+
+Expense classification catalog. One reserved row has `is_savings = true` (the "Ahorro" category);
+enforced as a singleton by a partial unique index.
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `created_at` | timestamptz | NO | | `now()` | |
+| `description` | varchar(300) | YES | | | |
+| `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `is_active` | boolean | NO | | `true` | Partial index on `is_active = true`. |
+| `is_savings` | boolean | NO | | `false` | At most one row may have `true` (singleton partial index). |
+| `name` | varchar(100) | NO | | | Case-insensitive unique via `lower(name)` index. |
+
+Constraints:
+
+- `expense_category_pkey` — PRIMARY KEY (`id`).
+
+Indexes:
+
+- `expense_category_pkey` — UNIQUE btree (`id`).
+- `expense_category_name_lower_uq` — UNIQUE btree (`lower(name)`).
+- `expense_category_savings_singleton` — UNIQUE btree (`is_savings`) WHERE `is_savings = true`.
+- `idx_expense_category_is_active` — btree (`is_active`) WHERE `is_active = true`.
+
+## Table: `income_category`
+
+Income classification catalog.
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `created_at` | timestamptz | NO | | `now()` | |
+| `description` | varchar(300) | YES | | | |
+| `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `is_active` | boolean | NO | | `true` | Partial index on `is_active = true`. |
+| `name` | varchar(100) | NO | | | Case-insensitive unique via `lower(name)` index. |
+
+Constraints:
+
+- `income_category_pkey` — PRIMARY KEY (`id`).
+
+Indexes:
+
+- `income_category_pkey` — UNIQUE btree (`id`).
+- `income_category_name_lower_uq` — UNIQUE btree (`lower(name)`).
+- `idx_income_category_is_active` — btree (`is_active`) WHERE `is_active = true`.
+
 ## Table: `ledger_entry`
 
 Transaction ledger; single source of truth for balances. Records income, expense, and transfer
-entries, each projected or cleared.
+entries, each projected or cleared. Category FKs are mutually exclusive by kind (enforced by
+`chk_category_kind`).
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -58,7 +106,9 @@ entries, each projected or cleared.
 | `amount` | integer | NO | | | Must be `> 0`. |
 | `concept` | varchar(200) | YES | | | |
 | `created_at` | timestamptz | NO | | `now()` | |
+| `expense_category_id` | integer | YES | FK | | FK → `expense_category.id`; set only for expense entries. |
 | `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `income_category_id` | integer | YES | FK | | FK → `income_category.id`; set only for income entries. |
 | `kind` | ledger_entry_kind | NO | | | Enum: income, expense, transfer. |
 | `occurred_at` | timestamptz | NO | | | Business date of the entry. |
 | `status` | ledger_entry_status | NO | | | Enum: cleared, projected. |
@@ -70,9 +120,15 @@ Constraints:
 - `ledger_entry_pkey` — PRIMARY KEY (`id`).
 - `ledger_entry_account_id_account_id_fk` — FK (`account_id`) → `account(id)`, ON DELETE no action,
   ON UPDATE no action.
+- `ledger_entry_expense_category_id_expense_category_id_fk` — FK (`expense_category_id`) →
+  `expense_category(id)`, ON DELETE no action, ON UPDATE no action.
+- `ledger_entry_income_category_id_income_category_id_fk` — FK (`income_category_id`) →
+  `income_category(id)`, ON DELETE no action, ON UPDATE no action.
 - `ledger_entry_to_account_id_account_id_fk` — FK (`to_account_id`) → `account(id)`, ON DELETE no
   action, ON UPDATE no action.
 - `chk_amount_positive` — `amount > 0`.
+- `chk_category_kind` — income entries must have `expense_category_id` NULL; expense entries must
+  have `income_category_id` NULL; transfer entries must have both NULL.
 - `chk_transfer_to_account` — `transfer` entries require `to_account_id`; non-transfer entries must
   leave it NULL.
 - `chk_no_self_transfer` — `to_account_id` NULL or `<> account_id`.
@@ -81,6 +137,10 @@ Indexes:
 
 - `ledger_entry_pkey` — UNIQUE btree (`id`).
 - `idx_ledger_entry_account_status` — btree (`account_id`, `status`).
+- `idx_ledger_entry_expense_category` — btree (`expense_category_id`) WHERE
+  `expense_category_id IS NOT NULL`.
+- `idx_ledger_entry_income_category` — btree (`income_category_id`) WHERE
+  `income_category_id IS NOT NULL`.
 - `idx_ledger_entry_occurred_at` — btree (`occurred_at`).
 - `idx_ledger_entry_to_account` — btree (`to_account_id`) WHERE `to_account_id IS NOT NULL`.
 

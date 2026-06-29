@@ -18,6 +18,23 @@ erDiagram
         timestamptz created_at "NOT NULL, default now()"
     }
 
+    expense_category {
+        integer id PK "GENERATED ALWAYS AS IDENTITY"
+        varchar name "NOT NULL, max 100"
+        varchar description "nullable, max 300"
+        boolean is_savings "NOT NULL, default false"
+        boolean is_active "NOT NULL, default true"
+        timestamptz created_at "NOT NULL, default now()"
+    }
+
+    income_category {
+        integer id PK "GENERATED ALWAYS AS IDENTITY"
+        varchar name "NOT NULL, max 100"
+        varchar description "nullable, max 300"
+        boolean is_active "NOT NULL, default true"
+        timestamptz created_at "NOT NULL, default now()"
+    }
+
     ledger_entry {
         integer id PK "GENERATED ALWAYS AS IDENTITY"
         ledger_entry_kind kind "NOT NULL"
@@ -29,10 +46,14 @@ erDiagram
         timestamptz updated_at "NOT NULL, default now()"
         integer account_id FK "NOT NULL"
         integer to_account_id FK "nullable, transfer only"
+        integer income_category_id FK "nullable, income entries only"
+        integer expense_category_id FK "nullable, expense entries only"
     }
 
     account ||--o{ ledger_entry : "account_id (source)"
     account ||--o{ ledger_entry : "to_account_id (transfer dest)"
+    income_category ||--o{ ledger_entry : "income_category_id"
+    expense_category ||--o{ ledger_entry : "expense_category_id"
 ```
 
 <!-- END GENERATED: erd -->
@@ -41,6 +62,9 @@ erDiagram
 
 - Enums: `account_kind` = (cash, debit, investment, credit); `ledger_entry_kind` =
   (income, expense, transfer); `ledger_entry_status` = (cleared, projected).
-- Both foreign keys (`account_id`, `to_account_id`) reference `account.id` with
-  `ON DELETE no action ON UPDATE no action`.
+- All foreign keys use `ON DELETE no action ON UPDATE no action`.
 - `to_account_id` is populated only for `transfer` entries (enforced by `chk_transfer_to_account`).
+- `income_category_id` and `expense_category_id` are mutually exclusive by entry kind (enforced by
+  `chk_category_kind`). Transfer entries leave both NULL.
+- `expense_category` has at most one row with `is_savings = true` (partial unique index
+  `expense_category_savings_singleton`).
