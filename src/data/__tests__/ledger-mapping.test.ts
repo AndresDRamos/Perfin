@@ -14,6 +14,8 @@ function row(overrides: Partial<LedgerEntryRow> = {}): LedgerEntryRow {
     updatedAt: new Date("2025-01-15"),
     accountId: 10,
     toAccountId: null,
+    incomeCategoryId: null,
+    expenseCategoryId: null,
     ...overrides,
   };
 }

@@ -18,20 +18,27 @@ const baseEntry = z.object({
 export const incomeSchema = baseEntry.extend({
   kind: z.literal("income"),
   toAccountId: z.undefined({ message: "income no acepta to_account_id" }).optional(),
+  categoryId: z.number().int().positive().optional(),
 });
 
 export const expenseSchema = baseEntry.extend({
   kind: z.literal("expense"),
   toAccountId: z.undefined({ message: "expense no acepta to_account_id" }).optional(),
+  categoryId: z.number().int().positive().optional(),
 });
 
-export const transferSchema = baseEntry.extend({
-  kind: z.literal("transfer"),
-  toAccountId: z.number().int().positive(),
-}).refine((d) => d.toAccountId !== d.accountId, {
-  message: "La cuenta destino debe ser diferente a la cuenta origen",
-  path: ["toAccountId"],
-});
+export const transferSchema = baseEntry
+  .extend({
+    kind: z.literal("transfer"),
+    toAccountId: z.number().int().positive(),
+    categoryId: z
+      .undefined({ message: "transfer no acepta categoryId" })
+      .optional(),
+  })
+  .refine((d) => d.toAccountId !== d.accountId, {
+    message: "La cuenta destino debe ser diferente a la cuenta origen",
+    path: ["toAccountId"],
+  });
 
 export const ledgerEntrySchema = z.discriminatedUnion("kind", [
   incomeSchema,
@@ -44,6 +51,11 @@ export type LedgerEntryInput = z.infer<typeof ledgerEntrySchema>;
 // ─── write operations ────────────────────────────────────────────────────────
 
 function toRow(input: LedgerEntryInput): NewLedgerEntry {
+  const incomeCategoryId =
+    input.kind === "income" ? (input.categoryId ?? null) : null;
+  const expenseCategoryId =
+    input.kind === "expense" ? (input.categoryId ?? null) : null;
+
   return {
     kind: input.kind,
     status: input.status,
@@ -52,6 +64,8 @@ function toRow(input: LedgerEntryInput): NewLedgerEntry {
     occurredAt: input.occurredAt,
     accountId: input.accountId,
     toAccountId: input.kind === "transfer" ? input.toAccountId : null,
+    incomeCategoryId,
+    expenseCategoryId,
   };
 }
 
@@ -64,6 +78,9 @@ export async function updateEntry(
   id: number,
   input: LedgerEntryInput
 ): Promise<LedgerEntryRow> {
+  // Always set both category columns explicitly so that changing kind
+  // nullifies the column that no longer applies (e.g., expense→income
+  // must clear expense_category_id or chk_category_kind fires).
   const [row] = await db
     .update(ledgerEntry)
     .set({ ...toRow(input), updatedAt: new Date() })
