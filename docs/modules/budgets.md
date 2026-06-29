@@ -1,7 +1,7 @@
 # Module: budgets
 
 - Type: budgets
-- Status: planned
+- Status: building   <!-- data layer + actions + UI landed (plan 0004); migration 0002_keen_terror applied to the live DB -->
 
 ## Purpose
 
@@ -10,11 +10,12 @@ Optional planning layer. A **plan** holds budgets, always tied to the available 
 
 ## Key entities / tables
 
-<!-- schema-derived: none of these tables exist in the live schema yet (as of 0000_strong_smasher); design below is planned. -->
+<!-- schema-derived: tables defined in src/data/schema/{plan,budget}.ts; migration drizzle/0002_keen_terror.sql applied to the live DB. -->
 
-- `plan` (id, name, period_start, period_end).
-- `budget` (id, plan_id, subtype, target_amount, period_start, period_end, category_id?, account_id?, horizon?).
-- Subtypes: `category_cap` (category + planned spend), `savings_reservation` (earmark into savings account), `purchase_goal` (item + target + horizon: short/medium/long).
+- `plan` (id, name, period_start, period_end, created_at). CHECK `chk_plan_period_order` (end >= start).
+- `budget` (id, plan_id, subtype, target_amount, period_start?, period_end?, expense_category_id?, account_id?, item_name?, horizon?, created_at). Polymorphic by `subtype`; `chk_budget_subtype_fields` enforces the column matrix (fail-closed, like `chk_category_kind`). Partial unique indexes prevent a duplicate cap per category / reservation per account within a plan. `plan_id` FK is ON DELETE cascade.
+- Subtypes: `category_cap` (expense_category + planned spend cap), `savings_reservation` (earmark into a destination account), `purchase_goal` (item_name + target + horizon: short/medium/long).
+- **Actuals are derived from the ledger** (`budget-repo.planProgress`): cap = expenses in the category within the window (real = cleared, projected = all); reservation = transfers into the account within the window; `purchase_goal` is target-only in v1 (no derived actual). The window is the budget's own `period_*` override when set, else the plan's. `savings_reservation` does **not** move money — it only tracks the transfers the user records.
 
 ## Public interface
 

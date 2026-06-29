@@ -2,6 +2,27 @@
 
 > Append-only. Each entry: date, what changed, and why. `docs-sync` appends; history is never rewritten.
 
+## 2026-06-29 — `0002_keen_terror` (budgets: plan + budget)
+
+- Created enums `budget_subtype` (category_cap, savings_reservation, purchase_goal) and
+  `purchase_horizon` (short, medium, long).
+- Created table `plan` with identity PK, `name` (varchar 100, NOT NULL), `period_start` (date,
+  NOT NULL), `period_end` (date, NOT NULL), `created_at`. Check constraint `chk_plan_period_order`
+  enforces `period_end >= period_start`.
+- Created table `budget` with identity PK, `plan_id` (NOT NULL), `subtype` (NOT NULL),
+  `target_amount` (integer, NOT NULL), optional `period_start`/`period_end` (date) window override,
+  `expense_category_id`, `account_id`, `item_name` (varchar 100), `horizon`, and `created_at`.
+- Added FK `budget_plan_id_plan_id_fk` → `plan(id)` ON DELETE cascade; FKs
+  `budget_expense_category_id_expense_category_id_fk` → `expense_category(id)` and
+  `budget_account_id_account_id_fk` → `account(id)`, both ON DELETE no action ON UPDATE no action.
+- Added check constraints: `chk_budget_target_positive` (`target_amount > 0`);
+  `chk_budget_period_pair` (period columns both NULL, or both set with `period_end >= period_start`);
+  `chk_budget_subtype_fields` enforcing the polymorphic column matrix per subtype (fail-closed).
+- Added indexes `idx_budget_plan_id`, partial `idx_budget_expense_category` and `idx_budget_account`
+  (WHERE NOT NULL), and partial unique indexes `budget_cap_category_uq` on (`plan_id`,
+  `expense_category_id`) WHERE `subtype = 'category_cap'` and `budget_reservation_account_uq` on
+  (`plan_id`, `account_id`) WHERE `subtype = 'savings_reservation'`.
+
 ## 2026-06-29 — `0001_loving_jubilee` (catalog categories + ledger links)
 
 - Created table `expense_category` with identity PK, `name` (varchar 100, NOT NULL), `description`

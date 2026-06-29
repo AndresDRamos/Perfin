@@ -50,10 +50,35 @@ erDiagram
         integer expense_category_id FK "nullable, expense entries only"
     }
 
+    plan {
+        integer id PK "GENERATED ALWAYS AS IDENTITY"
+        varchar name "NOT NULL, max 100"
+        date period_start "NOT NULL"
+        date period_end "NOT NULL, >= period_start"
+        timestamptz created_at "NOT NULL, default now()"
+    }
+
+    budget {
+        integer id PK "GENERATED ALWAYS AS IDENTITY"
+        integer plan_id FK "NOT NULL"
+        budget_subtype subtype "NOT NULL"
+        integer target_amount "NOT NULL, > 0"
+        date period_start "nullable, paired override"
+        date period_end "nullable, paired override"
+        integer expense_category_id FK "nullable, category_cap only"
+        integer account_id FK "nullable, savings_reservation only"
+        varchar item_name "nullable, purchase_goal only, max 100"
+        purchase_horizon horizon "nullable, purchase_goal only"
+        timestamptz created_at "NOT NULL, default now()"
+    }
+
     account ||--o{ ledger_entry : "account_id (source)"
     account ||--o{ ledger_entry : "to_account_id (transfer dest)"
     income_category ||--o{ ledger_entry : "income_category_id"
     expense_category ||--o{ ledger_entry : "expense_category_id"
+    plan ||--o{ budget : "plan_id (cascade)"
+    expense_category ||--o{ budget : "expense_category_id (category_cap)"
+    account ||--o{ budget : "account_id (savings_reservation)"
 ```
 
 <!-- END GENERATED: erd -->
@@ -61,8 +86,19 @@ erDiagram
 ## Notes
 
 - Enums: `account_kind` = (cash, debit, investment, credit); `ledger_entry_kind` =
-  (income, expense, transfer); `ledger_entry_status` = (cleared, projected).
-- All foreign keys use `ON DELETE no action ON UPDATE no action`.
+  (income, expense, transfer); `ledger_entry_status` = (cleared, projected);
+  `budget_subtype` = (category_cap, savings_reservation, purchase_goal);
+  `purchase_horizon` = (short, medium, long).
+- All foreign keys use `ON DELETE no action ON UPDATE no action`, except `budget.plan_id` →
+  `plan` which is `ON DELETE cascade`.
+- A `budget` is polymorphic by `subtype` (enforced by `chk_budget_subtype_fields`):
+  `category_cap` sets `expense_category_id`; `savings_reservation` sets `account_id`;
+  `purchase_goal` sets `item_name` + `horizon`. The other subtype-specific columns stay NULL.
+- `budget.period_start`/`period_end` are an optional paired window override (enforced by
+  `chk_budget_period_pair`); when both NULL the budget inherits the plan's period.
+- At most one `category_cap` per (`plan_id`, `expense_category_id`) and one
+  `savings_reservation` per (`plan_id`, `account_id`) via partial unique indexes
+  `budget_cap_category_uq` and `budget_reservation_account_uq`.
 - `to_account_id` is populated only for `transfer` entries (enforced by `chk_transfer_to_account`).
 - `income_category_id` and `expense_category_id` are mutually exclusive by entry kind (enforced by
   `chk_category_kind`). Transfer entries leave both NULL.

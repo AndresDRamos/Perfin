@@ -12,8 +12,10 @@ Schema: `public`. Tables and columns are sorted alphabetically for stable diffs.
 | Enum | Values (in definition order) |
 | --- | --- |
 | `account_kind` | cash, debit, investment, credit |
+| `budget_subtype` | category_cap, savings_reservation, purchase_goal |
 | `ledger_entry_kind` | income, expense, transfer |
 | `ledger_entry_status` | cleared, projected |
+| `purchase_horizon` | short, medium, long |
 
 ## Table: `account`
 
@@ -46,6 +48,56 @@ Indexes:
 
 - `account_pkey` — UNIQUE btree (`id`).
 - `idx_account_is_active` — btree (`is_active`) WHERE `is_active = true`.
+
+## Table: `budget`
+
+A single budget within a `plan`. Polymorphic by `subtype`: `category_cap` (planned spend cap for an
+`expense_category`), `savings_reservation` (earmark into a destination `account`), or `purchase_goal`
+(named target with a horizon). The `chk_budget_subtype_fields` matrix is fail-closed: only the
+columns for the active subtype may be set; all others must be NULL. Actuals are derived from the
+ledger, never stored.
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `account_id` | integer | YES | FK | | FK → `account.id`; set only for `savings_reservation`. |
+| `created_at` | timestamptz | NO | | `now()` | |
+| `expense_category_id` | integer | YES | FK | | FK → `expense_category.id`; set only for `category_cap`. |
+| `horizon` | purchase_horizon | YES | | | Enum: short, medium, long; set only for `purchase_goal`. |
+| `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `item_name` | varchar(100) | YES | | | Set only for `purchase_goal`. |
+| `period_end` | date | YES | | | Optional window override; paired with `period_start`. |
+| `period_start` | date | YES | | | Optional window override; paired with `period_end`. When both NULL the budget inherits the plan period. |
+| `plan_id` | integer | NO | FK | | FK → `plan.id`; ON DELETE cascade. |
+| `subtype` | budget_subtype | NO | | | Enum: category_cap, savings_reservation, purchase_goal. |
+| `target_amount` | integer | NO | | | Must be `> 0`. |
+
+Constraints:
+
+- `budget_pkey` — PRIMARY KEY (`id`).
+- `budget_plan_id_plan_id_fk` — FK (`plan_id`) → `plan(id)`, ON DELETE cascade, ON UPDATE no action.
+- `budget_expense_category_id_expense_category_id_fk` — FK (`expense_category_id`) →
+  `expense_category(id)`, ON DELETE no action, ON UPDATE no action.
+- `budget_account_id_account_id_fk` — FK (`account_id`) → `account(id)`, ON DELETE no action,
+  ON UPDATE no action.
+- `chk_budget_target_positive` — `target_amount > 0`.
+- `chk_budget_period_pair` — `period_start` and `period_end` are both NULL, or both set with
+  `period_end >= period_start`.
+- `chk_budget_subtype_fields` — `category_cap` requires `expense_category_id` (and NULL
+  `account_id`, `item_name`, `horizon`); `savings_reservation` requires `account_id` (and NULL
+  `expense_category_id`, `item_name`, `horizon`); `purchase_goal` requires `item_name` and `horizon`
+  (and NULL `expense_category_id`, `account_id`).
+
+Indexes:
+
+- `budget_pkey` — UNIQUE btree (`id`).
+- `budget_cap_category_uq` — UNIQUE btree (`plan_id`, `expense_category_id`) WHERE
+  `subtype = 'category_cap'`.
+- `budget_reservation_account_uq` — UNIQUE btree (`plan_id`, `account_id`) WHERE
+  `subtype = 'savings_reservation'`.
+- `idx_budget_plan_id` — btree (`plan_id`).
+- `idx_budget_expense_category` — btree (`expense_category_id`) WHERE
+  `expense_category_id IS NOT NULL`.
+- `idx_budget_account` — btree (`account_id`) WHERE `account_id IS NOT NULL`.
 
 ## Table: `expense_category`
 
@@ -143,5 +195,27 @@ Indexes:
   `income_category_id IS NOT NULL`.
 - `idx_ledger_entry_occurred_at` — btree (`occurred_at`).
 - `idx_ledger_entry_to_account` — btree (`to_account_id`) WHERE `to_account_id IS NOT NULL`.
+
+## Table: `plan`
+
+A planning container holding budgets over an arbitrary date range (not restricted to calendar
+months).
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `created_at` | timestamptz | NO | | `now()` | |
+| `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `name` | varchar(100) | NO | | | |
+| `period_end` | date | NO | | | Must be `>= period_start`. |
+| `period_start` | date | NO | | | |
+
+Constraints:
+
+- `plan_pkey` — PRIMARY KEY (`id`).
+- `chk_plan_period_order` — `period_end >= period_start`.
+
+Indexes:
+
+- `plan_pkey` — UNIQUE btree (`id`).
 
 <!-- END GENERATED: data-dictionary -->
