@@ -8,6 +8,13 @@
       "when": 1782744586406,
       "tag": "0000_strong_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782751161501,
+      "tag": "0001_loving_jubilee",
+      "breakpoints": true
     }
   ]
 }
