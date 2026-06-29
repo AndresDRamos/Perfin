@@ -1,0 +1,15 @@
+# Doc Routing
+
+Self-managed routing table. Maps each module type to which docs to read, which to skip, and which
+questions to ask up front. `/trace-map` reconciles this against the measured doc-access trace each
+session and proposes corrections.
+
+> Blind spot: the trace captures docs opened via Read/Grep/Glob only. It does NOT capture
+> `CLAUDE.md` auto-load or `@`-mentions. Account for that when reading trace-map's report.
+
+| Module type | Read | Skip | Ask up front |
+| --- | --- | --- | --- |
+| accounts | docs/modules/accounts.md; docs/database/data-dictionary.md | docs/plans/* (history) | Which account type(s)? Does it touch the opening-balance or derived-balance contract? |
+| ledger | docs/modules/ledger.md; docs/modules/accounts.md; docs/database/data-dictionary.md | docs/plans/* (history) | Which kind (income/expense/transfer)? cleared vs projected? Does it touch balance derivation? |
+| budgets | docs/modules/budgets.md; docs/modules/ledger.md; docs/database/data-dictionary.md | docs/plans/* (history) | Which sub-type (category cap / savings reservation / purchase goal)? Binds to real or projected available? |
+| catalog | docs/modules/catalog.md; docs/database/data-dictionary.md | docs/plans/* (history) | Income or expense catalog? Touches the reserved `savings` category or the fixed-expense recurrence engine? |
