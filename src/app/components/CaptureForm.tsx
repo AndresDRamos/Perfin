@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useActionState } from "react";
+import { useState, useActionState } from "react";
 import { captureEntry } from "@/app/actions/ledger";
 
 type Kind = "income" | "expense" | "transfer";
@@ -11,8 +11,15 @@ interface Account {
   kind: string;
 }
 
+interface Category {
+  id: number;
+  name: string;
+}
+
 interface Props {
   accounts: Account[];
+  incomeCategories: Category[];
+  expenseCategories: Category[];
 }
 
 interface FormState {
@@ -22,6 +29,7 @@ interface FormState {
 
 async function submitCapture(_prev: FormState, formData: FormData): Promise<FormState> {
   const kind = formData.get("kind") as Kind;
+  const rawCategoryId = formData.get("categoryId");
   const raw = {
     kind,
     amountPesos: Number(formData.get("amountPesos")),
@@ -31,15 +39,18 @@ async function submitCapture(_prev: FormState, formData: FormData): Promise<Form
     accountId: Number(formData.get("accountId")),
     toAccountId:
       kind === "transfer" ? Number(formData.get("toAccountId")) : undefined,
+    categoryId:
+      rawCategoryId && kind !== "transfer" ? Number(rawCategoryId) : undefined,
   };
   return captureEntry(raw);
 }
 
-export function CaptureForm({ accounts }: Props) {
+export function CaptureForm({ accounts, incomeCategories, expenseCategories }: Props) {
   const [kind, setKind] = useState<Kind>("expense");
   const [state, action, pending] = useActionState(submitCapture, {});
 
   const today = new Date().toISOString().slice(0, 10);
+  const categories = kind === "income" ? incomeCategories : expenseCategories;
 
   return (
     <form action={action} className="space-y-4 rounded-lg border p-4">
@@ -150,6 +161,24 @@ export function CaptureForm({ accounts }: Props) {
           {state.errors?.toAccountId && (
             <p className="text-red-600 text-xs mt-1">{state.errors.toAccountId[0]}</p>
           )}
+        </div>
+      )}
+
+      {/* categoryId — only for income / expense */}
+      {kind !== "transfer" && categories.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium">Categoría</label>
+          <select
+            name="categoryId"
+            className="mt-1 w-full rounded border px-3 py-1.5 text-sm"
+          >
+            <option value="">Sin categoría</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

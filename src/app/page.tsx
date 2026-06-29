@@ -5,20 +5,31 @@ import { eq } from "drizzle-orm";
 import { CaptureForm } from "@/app/components/CaptureForm";
 import { format } from "@/domain/money";
 import { money } from "@/domain/money";
+import {
+  listActiveIncomeCategories,
+  listActiveExpenseCategories,
+} from "@/data/category-repo";
 
 function formatMXN(pesos: number) {
   return format(money(Math.round(pesos * 100)));
 }
 
 export default async function Home() {
-  const [dashboard, accounts] = await Promise.all([
+  const [dashboard, accounts, incomeCategories, expenseCategories] = await Promise.all([
     getDashboard(),
     db.select().from(account).where(eq(account.isActive, true)),
+    listActiveIncomeCategories(),
+    listActiveExpenseCategories(),
   ]);
 
   return (
     <main className="mx-auto max-w-2xl p-8 space-y-8">
-      <h1 className="text-2xl font-semibold">Perfin</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Perfin</h1>
+        <a href="/categories" className="text-sm text-blue-600 hover:underline">
+          Categorías →
+        </a>
+      </div>
 
       {/* ── Dashboard ── */}
       <section className="space-y-3">
@@ -55,7 +66,11 @@ export default async function Home() {
       </section>
 
       {/* ── Capture form ── */}
-      <CaptureForm accounts={accounts.map((a) => ({ id: a.id, name: a.name, kind: a.kind }))} />
+      <CaptureForm
+        accounts={accounts.map((a) => ({ id: a.id, name: a.name, kind: a.kind }))}
+        incomeCategories={incomeCategories.map((c) => ({ id: c.id, name: c.name }))}
+        expenseCategories={expenseCategories.map((c) => ({ id: c.id, name: c.name }))}
+      />
     </main>
   );
 }
