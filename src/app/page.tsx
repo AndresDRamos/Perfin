@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDashboard } from "@/app/actions/ledger";
 import { db } from "@/data/db";
 import { account } from "@/data/schema";
@@ -27,12 +28,15 @@ export default async function Home() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Perfin</h1>
         <nav className="flex gap-4 text-sm text-blue-600">
-          <a href="/plans" className="hover:underline">
+          <Link href="/accounts" className="hover:underline">
+            Cuentas →
+          </Link>
+          <Link href="/plans" className="hover:underline">
             Planes →
-          </a>
-          <a href="/categories" className="hover:underline">
+          </Link>
+          <Link href="/categories" className="hover:underline">
             Categorías →
-          </a>
+          </Link>
         </nav>
       </div>
 
