@@ -26,6 +26,12 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   anti-duplicate indexes. Data layer (`budget-write` Zod discriminated union + dupe checks,
   `budget-repo.planProgress` for derived actuals), server actions, and UI (`/plans` pages + budget
   manager). Budgets **do not move money** -- actuals are derived from the ledger.
+- **Accounts module** (`0005-accounts-module`, complete) -- CRUD de cuentas + UI `/accounts` con
+  balance derivado; migración `0003_mighty_young_avengers` aplicada (bank, number enmascarado +
+  `chk_number_masked`, expiration_date día-1, vigente hasta fin de mes). `kind` y `opening_balance`
+  inmutables tras creación. Diferidos a plan propio: `currency` (v1 mono-moneda MXN) y
+  `account_interest_rate`. De paso: lint reparado (Next 16 flat config), pool de `db.ts` acotado
+  con singleton dev, journal drizzle re-sincronizado, migraciones vía pooler en `.env`.
 - **Next**: fixed expenses (`fixed_expense` table + recurrence engine) via `/plan-module` or
   `/ship-module`.
 
