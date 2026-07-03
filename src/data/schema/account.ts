@@ -1,6 +1,7 @@
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   pgEnum,
@@ -30,6 +31,14 @@ export const account = pgTable(
     cutoffDay: integer("cutoff_day"),   // 1-28
     paymentDay: integer("payment_day"), // 1-28
     creditLimit: integer("credit_limit"), // centavos, informational
+    // Descriptive metadata — informational only, no per-kind restriction
+    bank: varchar("bank", { length: 100 }),
+    // Masked identifier ("****1234", partial CLABE) — never a full card number
+    // (enforced by chk_number_masked)
+    number: varchar("number", { length: 30 }),
+    // Card validity, normalized to day 1; card is valid through the END of that month.
+    // UI captures/displays MM/YY.
+    expirationDate: date("expiration_date"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -44,6 +53,8 @@ export const account = pgTable(
     check("chk_payment_day_range", sql`${t.paymentDay} BETWEEN 1 AND 28`),
     check("chk_cutoff_ne_payment", sql`${t.cutoffDay} <> ${t.paymentDay}`),
     check("chk_credit_limit_pos", sql`${t.creditLimit} IS NULL OR ${t.creditLimit} > 0`),
+    // Reject a full PAN (13-19 straight digits) — only masked identifiers allowed
+    check("chk_number_masked", sql`${t.number} IS NULL OR ${t.number} !~ '^[0-9]{13,19}$'`),
     // Cuentas activas — evita seq scan en la lista del dashboard
     index("idx_account_is_active").on(t.isActive).where(sql`${t.isActive} = TRUE`),
   ]

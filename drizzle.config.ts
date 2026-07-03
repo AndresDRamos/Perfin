@@ -5,8 +5,10 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    // Use the Direct Connection URL (db.[ref].supabase.co:5432) for migrations.
-    // The Session Pooler URL (pooler.supabase.com:5432) can drop long-running DDL connections.
+    // DATABASE_URL_MIGRATE points to the Session Pooler (postgres user): the Direct
+    // Connection URL is IPv6-only and unreachable on this network. Fine for this
+    // project's small additive migrations; for very long-running DDL, run from a
+    // network with IPv6 using the direct URL (kept commented in .env).
     url: process.env.DATABASE_URL_MIGRATE ?? process.env.DATABASE_URL!,
   },
 });
