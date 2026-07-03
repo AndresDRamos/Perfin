@@ -36,6 +36,8 @@ the repo defines no hooks of its own. Traces land in `.claude/traces/` (untracke
 
 ## Conventions
 - Plans: `docs/plans/NNNN-name.md` (4 digits). ADRs: `docs/architecture/adr/NNN-title.md` (3 digits).
+- `docs/plans/` holds **only in-flight plans**: once a plan is committed, prune its file — git
+  history is the archive; durable knowledge goes to STATE.md / module docs / ADRs.
 - Plan modes (Reversibility x Density): Fast / Workshop / Review / Architecture.
 - Commits: Conventional Commits, atomic (one concern each).
 - The `db` MCP uses a read-only (SELECT-only) DB user. Secrets live in `.env` (gitignored), never in
