@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPlanDetail } from "@/app/actions/budgets";
 import { BudgetManager } from "./BudgetManager";
@@ -25,9 +26,9 @@ export default async function PlanDetailPage({
             {progress.plan.periodStart} → {progress.plan.periodEnd}
           </p>
         </div>
-        <a href="/plans" className="text-sm text-blue-600 hover:underline">
+        <Link href="/plans" className="text-sm text-blue-600 hover:underline">
           ← Planes
-        </a>
+        </Link>
       </div>
 
       <BudgetManager
