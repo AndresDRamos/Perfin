@@ -1,7 +1,7 @@
 # Module: budgets
 
 - Type: budgets
-- Status: building   <!-- data layer + actions + UI landed (plan 0004); migration 0002_keen_terror applied to the live DB -->
+- Status: active   <!-- plan 0004 landed: data layer + actions + UI; migration 0002_keen_terror applied to the live DB -->
 
 ## Purpose
 
@@ -31,6 +31,6 @@ Optional planning layer. A **plan** holds budgets, always tied to the available 
 
 ## Routing notes
 
-What a planner should read/ask before touching this module (feeds `doc-routing.md`).
+What a planner should read/ask before touching this module (feeds `docs-routing.md`).
 Read `docs/modules/budgets.md` + `docs/modules/ledger.md` + `docs/database/data-dictionary.md`.
 Ask: which sub-type? Binds to real or projected available? Does it move money (transfer) or only track?

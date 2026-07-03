@@ -20,8 +20,14 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   check), `category-repo` (list active/all). Ledger write path extended to accept `categoryId`.
   Server actions for category CRUD. UI: category select in `CaptureForm` (hidden for transfers),
   `/categories` management page.
-- **Next**: budgets module (category caps, savings reservation) via `/plan-module`; then fixed
-  expenses (`fixed_expense` table + recurrence engine).
+- **Budgets** (`0004-budgets`, complete) -- planning layer landed: `plan` + polymorphic `budget`
+  tables (migration `0002_keen_terror` applied), subtypes `category_cap` / `savings_reservation` /
+  `purchase_goal` enforced by `chk_budget_subtype_fields` (fail-closed) with partial unique
+  anti-duplicate indexes. Data layer (`budget-write` Zod discriminated union + dupe checks,
+  `budget-repo.planProgress` for derived actuals), server actions, and UI (`/plans` pages + budget
+  manager). Budgets **do not move money** -- actuals are derived from the ledger.
+- **Next**: fixed expenses (`fixed_expense` table + recurrence engine) via `/plan-module` or
+  `/ship-module`.
 
 ## Active risks
 
@@ -31,9 +37,8 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   single TZ for v1.
 - **Deferred fixed expenses**: `fixed_expense` table and recurrence engine not yet built; catalog
   module is still `building` until that lands.
-- **Deferred savings logic**: `expense_category.is_savings` flag and singleton index are in place,
-  but the accumulation target (`savings_target_account_id`) and budget enforcement are deferred to
-  the budgets module.
+- **Savings tracking is manual**: `savings_reservation` budgets only track transfers the user
+  records into the destination account; there is no automatic money movement or enforcement.
 
 ## Active logic
 

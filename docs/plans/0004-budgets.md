@@ -1,6 +1,6 @@
 # 0004 - Budgets
 
-- Status: active
+- Status: verified
 - Date: 2026-06-29
 - Mode: Review   <!-- DDL aditivo pero denso; sigue patrones aprobados (chk_category_kind), el CHECK polimórfico pide revisión cuidadosa -->
 
