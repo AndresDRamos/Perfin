@@ -2,6 +2,17 @@
 
 > Append-only. Each entry: date, what changed, and why. `docs-sync` appends; history is never rewritten.
 
+## 2026-07-03 — `0003_mighty_young_avengers` (accounts: descriptive metadata)
+
+- Added column `account.bank` (varchar 100, nullable) — institution name, informative only.
+- Added column `account.number` (varchar 30, nullable) — masked identifier; NEVER a full PAN.
+- Added column `account.expiration_date` (date, nullable) — card expiry normalized to day 1 of the
+  month; the card is valid through the LAST day of that month. UI captures/displays MM/YY.
+- Added check constraint `chk_number_masked` — `number IS NULL OR number !~ '^[0-9]{13,19}$'`,
+  rejecting full card numbers.
+- Why: plan 0005-accounts-module — CRUD for the accounts module; optional descriptive fields.
+  `currency` and `account_interest_rate` explicitly deferred.
+
 ## 2026-06-29 — `0002_keen_terror` (budgets: plan + budget)
 
 - Created enums `budget_subtype` (category_cap, savings_reservation, purchase_goal) and

@@ -16,6 +16,9 @@ erDiagram
         integer credit_limit "nullable, credit only"
         boolean is_active "NOT NULL, default true"
         timestamptz created_at "NOT NULL, default now()"
+        varchar bank "nullable, max 100, informative"
+        varchar number "nullable, max 30, masked - never a full PAN"
+        date expiration_date "nullable, normalized to day 1 of month"
     }
 
     expense_category {

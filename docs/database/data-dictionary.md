@@ -24,13 +24,16 @@ ledger entries.
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `bank` | varchar(100) | YES | | | Institution name; informative only. |
 | `created_at` | timestamptz | NO | | `now()` | |
 | `credit_limit` | integer | YES | | | Credit accounts only; `> 0` when present. |
 | `cutoff_day` | integer | YES | | | Credit accounts only; range 1-28. |
+| `expiration_date` | date | YES | | | Card expiry, normalized to day 1 of the month; the card is valid through the LAST day of that month. UI captures/displays MM/YY. |
 | `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
 | `is_active` | boolean | NO | | `true` | Partial index on `is_active = true`. |
 | `kind` | account_kind | NO | | | Enum: cash, debit, investment, credit. |
 | `name` | varchar(100) | NO | | | |
+| `number` | varchar(30) | YES | | | Masked identifier; NEVER a full PAN (rejected by `chk_number_masked`). |
 | `opening_balance` | integer | NO | | `0` | Seeds the derived balance. |
 | `payment_day` | integer | YES | | | Credit accounts only; range 1-28. |
 
@@ -43,6 +46,8 @@ Constraints:
 - `chk_payment_day_range` — `payment_day` BETWEEN 1 AND 28.
 - `chk_cutoff_ne_payment` — `cutoff_day <> payment_day`.
 - `chk_credit_limit_pos` — `credit_limit` NULL or `> 0`.
+- `chk_number_masked` — `number` IS NULL OR `number !~ '^[0-9]{13,19}$'` (rejects bare full card
+  numbers/PANs).
 
 Indexes:
 
