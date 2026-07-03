@@ -30,7 +30,7 @@ ledger balance.
 
 ## Routing notes
 
-What a planner should read/ask before touching this module (feeds `doc-routing.md`).
+What a planner should read/ask before touching this module (feeds `docs-routing.md`).
 Read `docs/modules/accounts.md` + `docs/database/data-dictionary.md`. Ask: which account type(s)?
 Does the change touch the opening-balance or derived-balance contract (balance must stay derived,
 never stored)?

@@ -33,7 +33,7 @@ projected available. Fast capture is the top priority (the user records constant
 
 ## Routing notes
 
-What a planner should read/ask before touching this module (feeds `doc-routing.md`).
+What a planner should read/ask before touching this module (feeds `docs-routing.md`).
 Read `docs/modules/ledger.md` + `docs/modules/accounts.md` + `docs/database/data-dictionary.md`.
 Ask: which kind? cleared vs projected semantics? Does it touch balance derivation or the
 transfers-excluded-from-budgets invariant?

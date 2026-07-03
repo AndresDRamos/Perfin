@@ -8,4 +8,4 @@
 ## Public interface
 ## Dependencies
 ## Routing notes
-What a planner should read/ask before touching this module (feeds `doc-routing.md`).
+What a planner should read/ask before touching this module (feeds `docs-routing.md`).

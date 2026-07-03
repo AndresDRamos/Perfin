@@ -49,6 +49,6 @@ category) and **fixed expenses** (recurring monthly transactions carrying a subt
 
 ## Routing notes
 
-What a planner should read/ask before touching this module (feeds `doc-routing.md`).
+What a planner should read/ask before touching this module (feeds `docs-routing.md`).
 Read `docs/modules/catalog.md` + `docs/database/data-dictionary.md`. Ask: income or expense catalog?
 Does it touch the reserved `savings` category or the fixed-expense recurrence engine?
