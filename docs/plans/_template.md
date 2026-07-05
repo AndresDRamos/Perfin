@@ -1,6 +1,6 @@
-# NNNN - <Plan name>
+# <slug> - <Plan name>
 
-- Status: active            <!-- active | superseded by NNNN | done -->
+- Status: active            <!-- active | superseded by <slug> | done -->
 - Date: YYYY-MM-DD
 - Mode: Fast | Workshop | Review | Architecture   <!-- Reversibility x Density -->
 
