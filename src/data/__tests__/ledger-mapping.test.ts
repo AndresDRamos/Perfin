@@ -5,6 +5,7 @@ import { LedgerEntryRow } from "../schema";
 function row(overrides: Partial<LedgerEntryRow> = {}): LedgerEntryRow {
   return {
     id: 1,
+    userId: "00000000-0000-0000-0000-000000000001",
     kind: "expense",
     status: "cleared",
     amount: 5000,

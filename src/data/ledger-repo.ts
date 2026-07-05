@@ -1,4 +1,4 @@
-import { eq, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "./db";
 import { account, ledgerEntry, LedgerEntryRow } from "./schema";
 import { toSignedLegs, toCreditLegs } from "./ledger-mapping";
@@ -8,31 +8,25 @@ import { CreditLedgerEntry } from "@/domain/credit";
 import { deriveBalance } from "@/domain/balances";
 
 // ─── raw fetch helpers ───────────────────────────────────────────────────────
+// user_id is denormalized onto ledger_entry (copied from account.user_id at
+// write time — see ledger-write.ts), so scoping by it directly is equivalent
+// to "any entry touching one of my accounts" without needing an account-id
+// list: in v1 every leg of an entry (including transfers) shares one owner.
 
-async function fetchEntriesForAccounts(accountIds: number[]): Promise<LedgerEntryRow[]> {
-  if (accountIds.length === 0) return [];
-  return db
-    .select()
-    .from(ledgerEntry)
-    .where(
-      or(
-        ...accountIds.map((id) => eq(ledgerEntry.accountId, id)),
-        ...accountIds.map((id) => eq(ledgerEntry.toAccountId, id))
-      )
-    );
+async function fetchEntriesForUser(userId: string): Promise<LedgerEntryRow[]> {
+  return db.select().from(ledgerEntry).where(eq(ledgerEntry.userId, userId));
 }
 
 // ─── public read API ─────────────────────────────────────────────────────────
 
 // All active accounts with their signed entries, ready for domain calls.
-export async function allAccountsForAvailable(): Promise<AccountForAvailable[]> {
+export async function allAccountsForAvailable(userId: string): Promise<AccountForAvailable[]> {
   const accounts = await db
     .select()
     .from(account)
-    .where(eq(account.isActive, true));
+    .where(and(eq(account.userId, userId), eq(account.isActive, true)));
 
-  const ids = accounts.map((a) => a.id);
-  const rows = await fetchEntriesForAccounts(ids);
+  const rows = await fetchEntriesForUser(userId);
 
   // Build a map: accountId → signed LedgerEntry[]
   const legsByAccount = new Map<number, AccountForAvailable["entries"]>();
@@ -53,20 +47,15 @@ export async function allAccountsForAvailable(): Promise<AccountForAvailable[]> 
 }
 
 // Derived balance for a single account.
-export async function balanceOf(accountId: number): Promise<Money> {
+export async function balanceOf(userId: string, accountId: number): Promise<Money> {
   const [acc] = await db
     .select()
     .from(account)
-    .where(eq(account.id, accountId))
+    .where(and(eq(account.id, accountId), eq(account.userId, userId)))
     .limit(1);
   if (!acc) throw new Error(`Account ${accountId} not found`);
 
-  const rows = await db
-    .select()
-    .from(ledgerEntry)
-    .where(
-      or(eq(ledgerEntry.accountId, accountId), eq(ledgerEntry.toAccountId, accountId))
-    );
+  const rows = await fetchEntriesForUser(userId);
 
   const entries = rows.flatMap((row) =>
     toSignedLegs(row)
@@ -78,13 +67,11 @@ export async function balanceOf(accountId: number): Promise<Money> {
 }
 
 // Signed credit entries for a single credit account (for currentStatementOwed / nextDueDate).
-export async function creditEntriesFor(accountId: number): Promise<CreditLedgerEntry[]> {
-  const rows = await db
-    .select()
-    .from(ledgerEntry)
-    .where(
-      or(eq(ledgerEntry.accountId, accountId), eq(ledgerEntry.toAccountId, accountId))
-    );
+export async function creditEntriesFor(
+  userId: string,
+  accountId: number
+): Promise<CreditLedgerEntry[]> {
+  const rows = await fetchEntriesForUser(userId);
 
   return rows.flatMap((row) =>
     toCreditLegs(row)

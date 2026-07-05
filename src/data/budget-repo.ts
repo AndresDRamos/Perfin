@@ -4,16 +4,23 @@ import { plan, budget, ledgerEntry, PlanRow, BudgetRow } from "./schema";
 
 // ─── plan / budget reads ────────────────────────────────────────────────────────
 
-export async function listPlans(): Promise<PlanRow[]> {
-  return db.select().from(plan).orderBy(plan.periodStart);
+export async function listPlans(userId: string): Promise<PlanRow[]> {
+  return db.select().from(plan).where(eq(plan.userId, userId)).orderBy(plan.periodStart);
 }
 
-export async function getPlan(id: number): Promise<PlanRow | undefined> {
-  const [row] = await db.select().from(plan).where(eq(plan.id, id)).limit(1);
+export async function getPlan(userId: string, id: number): Promise<PlanRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(plan)
+    .where(and(eq(plan.id, id), eq(plan.userId, userId)))
+    .limit(1);
   return row;
 }
 
-export async function listBudgets(planId: number): Promise<BudgetRow[]> {
+// Not user-scoped directly (budget has no user_id — it inherits ownership via
+// plan_id). Safe only because its one caller, planProgress, already resolves
+// the plan through the owner-scoped getPlan above before reaching here.
+async function listBudgets(planId: number): Promise<BudgetRow[]> {
   return db.select().from(budget).where(eq(budget.planId, planId)).orderBy(budget.id);
 }
 
@@ -113,8 +120,11 @@ async function progressFor(b: BudgetRow, p: PlanRow): Promise<BudgetProgress> {
   return { budget: b, realActual: 0, projectedActual: 0 };
 }
 
-export async function planProgress(planId: number): Promise<PlanProgress | undefined> {
-  const p = await getPlan(planId);
+export async function planProgress(
+  userId: string,
+  planId: number
+): Promise<PlanProgress | undefined> {
+  const p = await getPlan(userId, planId);
   if (!p) return undefined;
   const budgets = await listBudgets(planId);
   const progress = await Promise.all(budgets.map((b) => progressFor(b, p)));

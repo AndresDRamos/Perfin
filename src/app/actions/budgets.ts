@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   planCreateSchema,
   planUpdateSchema,
@@ -17,34 +17,38 @@ import {
 } from "@/data/budget-write";
 import { listPlans, planProgress, type PlanProgress } from "@/data/budget-repo";
 import { listActiveExpenseCategories } from "@/data/category-repo";
+import { requireSessionUser } from "@/data/auth-repo";
 import { db } from "@/data/db";
 import { account, plan, type PlanRow, type Account, type ExpenseCategoryRow } from "@/data/schema";
 
 // ─── plan CRUD ──────────────────────────────────────────────────────────────────
 
 export async function createPlanAction(raw: unknown) {
+  const { userId } = await requireSessionUser();
   const parsed = planCreateSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false as const, errors: parsed.error.flatten().fieldErrors };
   }
-  const row = await createPlan(parsed.data);
+  const row = await createPlan(userId, parsed.data);
   revalidatePath("/plans");
   return { ok: true as const, id: row.id };
 }
 
 export async function updatePlanAction(id: number, raw: unknown) {
+  const { userId } = await requireSessionUser();
   const parsed = planUpdateSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false as const, errors: parsed.error.flatten().fieldErrors };
   }
-  const row = await updatePlan(id, parsed.data);
+  const row = await updatePlan(userId, id, parsed.data);
   revalidatePath("/plans");
   revalidatePath(`/plans/${id}`);
   return { ok: true as const, id: row.id };
 }
 
 export async function deletePlanAction(id: number) {
-  await deletePlan(id); // budgets cascade
+  const { userId } = await requireSessionUser();
+  await deletePlan(userId, id); // budgets cascade
   revalidatePath("/plans");
   return { ok: true as const };
 }
@@ -52,43 +56,47 @@ export async function deletePlanAction(id: number) {
 // ─── budget CRUD ──────────────────────────────────────────────────────────────
 
 export async function createBudgetAction(raw: unknown) {
+  const { userId } = await requireSessionUser();
   const parsed = budgetSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false as const, errors: parsed.error.flatten().fieldErrors };
   }
-  const dupe = await checkDuplicate(parsed.data);
+  const dupe = await checkDuplicate(userId, parsed.data);
   if (dupe) return dupe;
-  const row = await createBudget(parsed.data);
+  const row = await createBudget(userId, parsed.data);
   revalidatePath(`/plans/${parsed.data.planId}`);
   return { ok: true as const, id: row.id };
 }
 
 export async function updateBudgetAction(id: number, raw: unknown) {
+  const { userId } = await requireSessionUser();
   const parsed = budgetSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false as const, errors: parsed.error.flatten().fieldErrors };
   }
-  const dupe = await checkDuplicate(parsed.data, id);
+  const dupe = await checkDuplicate(userId, parsed.data, id);
   if (dupe) return dupe;
-  const row = await updateBudget(id, parsed.data);
+  const row = await updateBudget(userId, id, parsed.data);
   revalidatePath(`/plans/${parsed.data.planId}`);
   return { ok: true as const, id: row.id };
 }
 
 export async function deleteBudgetAction(id: number, planId: number) {
-  await deleteBudget(id);
+  const { userId } = await requireSessionUser();
+  await deleteBudget(userId, id, planId);
   revalidatePath(`/plans/${planId}`);
   return { ok: true as const };
 }
 
 // Friendly duplicate guard mirroring the partial unique indexes.
 async function checkDuplicate(
+  userId: string,
   data: ReturnType<typeof budgetSchema.parse>,
   excludeId?: number
 ) {
   if (
     data.subtype === "category_cap" &&
-    (await capCategoryExists(data.planId, data.expenseCategoryId, excludeId))
+    (await capCategoryExists(userId, data.planId, data.expenseCategoryId, excludeId))
   ) {
     return {
       ok: false as const,
@@ -97,7 +105,7 @@ async function checkDuplicate(
   }
   if (
     data.subtype === "savings_reservation" &&
-    (await reservationAccountExists(data.planId, data.accountId, excludeId))
+    (await reservationAccountExists(userId, data.planId, data.accountId, excludeId))
   ) {
     return {
       ok: false as const,
@@ -110,7 +118,8 @@ async function checkDuplicate(
 // ─── reads ────────────────────────────────────────────────────────────────────
 
 export async function getPlansPage(): Promise<{ plans: PlanRow[] }> {
-  const plans = await listPlans();
+  const { userId } = await requireSessionUser();
+  const plans = await listPlans(userId);
   return { plans };
 }
 
@@ -121,17 +130,27 @@ export interface PlanDetail {
 }
 
 export async function getPlanDetail(planId: number): Promise<PlanDetail | null> {
-  const progress = await planProgress(planId);
+  const { userId } = await requireSessionUser();
+  const progress = await planProgress(userId, planId);
   if (!progress) return null;
   const [expenseCategories, accounts] = await Promise.all([
     listActiveExpenseCategories(),
-    db.select().from(account).where(eq(account.isActive, true)).orderBy(account.name),
+    db
+      .select()
+      .from(account)
+      .where(and(eq(account.userId, userId), eq(account.isActive, true)))
+      .orderBy(account.name),
   ]);
   return { progress, expenseCategories, accounts };
 }
 
 // Used by the plan-creation flow before any detail page exists.
 export async function getPlanById(id: number): Promise<PlanRow | undefined> {
-  const [row] = await db.select().from(plan).where(eq(plan.id, id)).limit(1);
+  const { userId } = await requireSessionUser();
+  const [row] = await db
+    .select()
+    .from(plan)
+    .where(and(eq(plan.id, id), eq(plan.userId, userId)))
+    .limit(1);
   return row;
 }

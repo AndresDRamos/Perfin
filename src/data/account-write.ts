@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { account, Account, NewAccount } from "./schema";
 
@@ -96,7 +96,7 @@ export type AccountUpdateInput = z.infer<typeof accountUpdateSchema>;
 
 // ─── mappers ─────────────────────────────────────────────────────────────────
 
-function toCreateRow(input: AccountCreateInput): NewAccount {
+function toCreateRow(input: AccountCreateInput): Omit<NewAccount, "userId"> {
   return {
     name: input.name,
     kind: input.kind,
@@ -115,16 +115,27 @@ function toCreateRow(input: AccountCreateInput): NewAccount {
 
 // ─── writes ────────────────────────────────────────────────────────────────────
 
-export async function createAccount(input: AccountCreateInput): Promise<Account> {
+export async function createAccount(userId: string, input: AccountCreateInput): Promise<Account> {
   const parsed = accountCreateSchema.parse(input);
-  const [row] = await db.insert(account).values(toCreateRow(parsed)).returning();
+  const [row] = await db
+    .insert(account)
+    .values({ ...toCreateRow(parsed), userId })
+    .returning();
   return row;
 }
 
-export async function updateAccount(id: number, input: AccountUpdateInput): Promise<Account> {
+export async function updateAccount(
+  userId: string,
+  id: number,
+  input: AccountUpdateInput
+): Promise<Account> {
   const parsed = accountUpdateSchema.parse(input);
 
-  const [current] = await db.select().from(account).where(eq(account.id, id)).limit(1);
+  const [current] = await db
+    .select()
+    .from(account)
+    .where(and(eq(account.id, id), eq(account.userId, userId)))
+    .limit(1);
   if (!current) throw new Error(`account ${id} not found`);
 
   const touchesCreditFields =
@@ -158,36 +169,45 @@ export async function updateAccount(id: number, input: AccountUpdateInput): Prom
       parsed.creditLimitPesos === null ? null : Math.round(parsed.creditLimitPesos * 100);
   }
 
-  const [row] = await db.update(account).set(patch).where(eq(account.id, id)).returning();
+  const [row] = await db
+    .update(account)
+    .set(patch)
+    .where(and(eq(account.id, id), eq(account.userId, userId)))
+    .returning();
   return row;
 }
 
-export async function deactivateAccount(id: number): Promise<Account> {
+export async function deactivateAccount(userId: string, id: number): Promise<Account> {
   const [row] = await db
     .update(account)
     .set({ isActive: false })
-    .where(eq(account.id, id))
+    .where(and(eq(account.id, id), eq(account.userId, userId)))
     .returning();
   if (!row) throw new Error(`account ${id} not found`);
   return row;
 }
 
-export async function reactivateAccount(id: number): Promise<Account> {
+export async function reactivateAccount(userId: string, id: number): Promise<Account> {
   const [row] = await db
     .update(account)
     .set({ isActive: true })
-    .where(eq(account.id, id))
+    .where(and(eq(account.id, id), eq(account.userId, userId)))
     .returning();
   if (!row) throw new Error(`account ${id} not found`);
   return row;
 }
 
 // ─── duplicate check (case-insensitive, app-level — no unique index needed) ─────
+// Scoped per user: two different users may each name an account "Efectivo".
 
-export async function accountNameExists(name: string, excludeId?: number): Promise<boolean> {
+export async function accountNameExists(
+  userId: string,
+  name: string,
+  excludeId?: number
+): Promise<boolean> {
   const rows = await db
     .select({ id: account.id })
     .from(account)
-    .where(sql`lower(${account.name}) = lower(${name})`);
+    .where(and(eq(account.userId, userId), sql`lower(${account.name}) = lower(${name})`));
   return rows.some((r) => r.id !== excludeId);
 }

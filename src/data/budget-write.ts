@@ -3,6 +3,18 @@ import { and, eq } from "drizzle-orm";
 import { db } from "./db";
 import { plan, budget, NewBudget, PlanRow, BudgetRow } from "./schema";
 
+// Every budget write takes a planId in its input; this confirms the plan is
+// actually owned by the caller before any insert/update/delete touches it —
+// otherwise a user could attach budgets to (or probe) another user's plan.
+async function assertOwnedPlan(userId: string, planId: number): Promise<void> {
+  const [row] = await db
+    .select({ id: plan.id })
+    .from(plan)
+    .where(and(eq(plan.id, planId), eq(plan.userId, userId)))
+    .limit(1);
+  if (!row) throw new Error(`plan ${planId} not found`);
+}
+
 // ─── shared building blocks ────────────────────────────────────────────────────
 
 const isoDate = z
@@ -114,11 +126,12 @@ function toBudgetRow(input: BudgetInput): NewBudget {
 
 // ─── plan writes ────────────────────────────────────────────────────────────────
 
-export async function createPlan(input: PlanCreateInput): Promise<PlanRow> {
+export async function createPlan(userId: string, input: PlanCreateInput): Promise<PlanRow> {
   const parsed = planCreateSchema.parse(input);
   const [row] = await db
     .insert(plan)
     .values({
+      userId,
       name: parsed.name,
       periodStart: parsed.periodStart,
       periodEnd: parsed.periodEnd,
@@ -127,50 +140,75 @@ export async function createPlan(input: PlanCreateInput): Promise<PlanRow> {
   return row;
 }
 
-export async function updatePlan(id: number, input: PlanUpdateInput): Promise<PlanRow> {
+export async function updatePlan(
+  userId: string,
+  id: number,
+  input: PlanUpdateInput
+): Promise<PlanRow> {
   const parsed = planUpdateSchema.parse(input);
-  const [row] = await db.update(plan).set({ ...parsed }).where(eq(plan.id, id)).returning();
+  const [row] = await db
+    .update(plan)
+    .set({ ...parsed })
+    .where(and(eq(plan.id, id), eq(plan.userId, userId)))
+    .returning();
   if (!row) throw new Error(`plan ${id} not found`);
   return row;
 }
 
 // Hard delete; budget children cascade (FK ON DELETE cascade).
-export async function deletePlan(id: number): Promise<void> {
-  const rows = await db.delete(plan).where(eq(plan.id, id)).returning({ id: plan.id });
+export async function deletePlan(userId: string, id: number): Promise<void> {
+  const rows = await db
+    .delete(plan)
+    .where(and(eq(plan.id, id), eq(plan.userId, userId)))
+    .returning({ id: plan.id });
   if (rows.length === 0) throw new Error(`plan ${id} not found`);
 }
 
 // ─── budget writes ────────────────────────────────────────────────────────────
 
-export async function createBudget(input: BudgetInput): Promise<BudgetRow> {
+export async function createBudget(userId: string, input: BudgetInput): Promise<BudgetRow> {
+  await assertOwnedPlan(userId, input.planId);
   const [row] = await db.insert(budget).values(toBudgetRow(input)).returning();
   return row;
 }
 
-export async function updateBudget(id: number, input: BudgetInput): Promise<BudgetRow> {
+export async function updateBudget(
+  userId: string,
+  id: number,
+  input: BudgetInput
+): Promise<BudgetRow> {
+  await assertOwnedPlan(userId, input.planId);
   // Rewrite every conditional column so a subtype change nullifies stale ones
-  // (same discipline as ledger-write.toRow vs chk_category_kind).
+  // (same discipline as ledger-write.toRow vs chk_category_kind). Scoping by
+  // plan_id too confirms the budget being edited actually sits under the
+  // now-verified-owned plan, not just any budget id.
   const [row] = await db
     .update(budget)
     .set(toBudgetRow(input))
-    .where(eq(budget.id, id))
+    .where(and(eq(budget.id, id), eq(budget.planId, input.planId)))
     .returning();
   if (!row) throw new Error(`budget ${id} not found`);
   return row;
 }
 
-export async function deleteBudget(id: number): Promise<void> {
-  const rows = await db.delete(budget).where(eq(budget.id, id)).returning({ id: budget.id });
+export async function deleteBudget(userId: string, id: number, planId: number): Promise<void> {
+  await assertOwnedPlan(userId, planId);
+  const rows = await db
+    .delete(budget)
+    .where(and(eq(budget.id, id), eq(budget.planId, planId)))
+    .returning({ id: budget.id });
   if (rows.length === 0) throw new Error(`budget ${id} not found`);
 }
 
 // ─── duplicate checks (friendly error before the DB unique index fires) ─────────
 
 export async function capCategoryExists(
+  userId: string,
   planId: number,
   expenseCategoryId: number,
   excludeId?: number
 ): Promise<boolean> {
+  await assertOwnedPlan(userId, planId);
   const rows = await db
     .select({ id: budget.id })
     .from(budget)
@@ -185,10 +223,12 @@ export async function capCategoryExists(
 }
 
 export async function reservationAccountExists(
+  userId: string,
   planId: number,
   accountId: number,
   excludeId?: number
 ): Promise<boolean> {
+  await assertOwnedPlan(userId, planId);
   const rows = await db
     .select({ id: budget.id })
     .from(budget)
