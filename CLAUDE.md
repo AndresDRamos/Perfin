@@ -14,7 +14,7 @@ The pipeline skills live at the user level; this repo only keeps the project-spe
   Use for large plans, destructive migrations, or handoffs to another session.
 - `/ship-module <type>` -> fast lane: plan + (on approval) build, docs-sync and verify in one
   continuous pass. Use for small-to-medium same-session changes.
-- `/build-plan NNNN` -> executes a saved plan, syncs docs, verifies against the plan's objective
+- `/build-plan <slug>` -> executes a saved plan, syncs docs, verifies against the plan's objective
   and marks it `status: verified`. Does NOT commit.
 - `/commit-plan` -> atomic Conventional Commits + curates STATE.md as a final
   `chore(state): sync repo context`. Refuses if the plan isn't `status: verified`. Asks before
@@ -35,10 +35,18 @@ Doc-access tracing comes from the **user-level** hook (`~/.claude/hooks/trace-do
 the repo defines no hooks of its own. Traces land in `.claude/traces/` (untracked).
 
 ## Conventions
-- Plans: `docs/plans/NNNN-name.md` (4 digits). ADRs: `docs/architecture/adr/NNN-title.md` (3 digits).
+- Plans: `docs/plans/<slug>.md` -- **no number**; the slug is the identity (matches the branch
+  name `<type>/<slug>`). Numeric prefixes are reserved for artifacts that accumulate forever and
+  need a stable sequence: migrations (auto-numbered by Drizzle, e.g. `0004_...`) and ADRs
+  (`docs/architecture/adr/NNN-title.md`, 3 digits).
 - `docs/plans/` holds **only in-flight plans**: once a plan is committed, prune its file — git
   history is the archive; durable knowledge goes to STATE.md / module docs / ADRs.
 - Plan modes (Reversibility x Density): Fast / Workshop / Review / Architecture.
 - Commits: Conventional Commits, atomic (one concern each).
 - The `db` MCP uses a read-only (SELECT-only) DB user. Secrets live in `.env` (gitignored), never in
   `.mcp.json` -- use `${VAR}` expansion.
+- RLS is enabled on every `public` table (the app connects as the table owner and bypasses it).
+  **Every new table** must declare `pgPolicy("<table>_select_mcp_readonly", ...)` (see
+  `src/data/schema/roles.ts`) and hand-add `GRANT SELECT ... TO "mcp_readonly"` in its migration,
+  or the `db` MCP (dba/docs-sync) will see the table as empty -- rows, not just schema, silently
+  disappear for that role.

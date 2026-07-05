@@ -5,11 +5,15 @@ import {
   index,
   integer,
   pgEnum,
+  pgPolicy,
   pgTable,
   timestamp,
+  uuid,
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { authUsers } from "./auth-users";
+import { mcpReadonly } from "./roles";
 
 export const accountKindEnum = pgEnum("account_kind", [
   "cash",
@@ -22,6 +26,12 @@ export const account = pgTable(
   "account",
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    // Owner. Immutable after creation (enforced in account-write, like kind and
+    // opening_balance). RESTRICT: deleting an auth user with real-money accounts
+    // must fail loudly, never cascade silently.
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "restrict" }),
     name: varchar("name", { length: 100 }).notNull(),
     kind: accountKindEnum("kind").notNull(),
     // Opening balance in centavos (MXN). Never updated after creation.
@@ -57,6 +67,13 @@ export const account = pgTable(
     check("chk_number_masked", sql`${t.number} IS NULL OR ${t.number} !~ '^[0-9]{13,19}$'`),
     // Cuentas activas — evita seq scan en la lista del dashboard
     index("idx_account_is_active").on(t.isActive).where(sql`${t.isActive} = TRUE`),
+    // Scoping por dueño: toda query de dominio filtra por user_id
+    index("idx_account_user_id").on(t.userId),
+    pgPolicy("account_select_mcp_readonly", {
+      for: "select",
+      to: mcpReadonly,
+      using: sql`true`,
+    }),
   ]
 );
 

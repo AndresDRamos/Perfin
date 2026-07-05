@@ -4,12 +4,14 @@ import {
   index,
   integer,
   pgEnum,
+  pgPolicy,
   pgTable,
   timestamp,
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { mcpReadonly } from "./roles";
 import { plan } from "./plan";
 import { account } from "./account";
 import { expenseCategory } from "./expense-category";
@@ -83,6 +85,11 @@ export const budget = pgTable(
     uniqueIndex("budget_reservation_account_uq")
       .on(t.planId, t.accountId)
       .where(sql`${t.subtype} = 'savings_reservation'`),
+    pgPolicy("budget_select_mcp_readonly", {
+      for: "select",
+      to: mcpReadonly,
+      using: sql`true`,
+    }),
   ]
 );
 

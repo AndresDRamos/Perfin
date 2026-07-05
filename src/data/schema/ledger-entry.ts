@@ -3,11 +3,15 @@ import {
   index,
   integer,
   pgEnum,
+  pgPolicy,
   pgTable,
   timestamp,
+  uuid,
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { authUsers } from "./auth-users";
+import { mcpReadonly } from "./roles";
 import { account } from "./account";
 import { incomeCategory } from "./income-category";
 import { expenseCategory } from "./expense-category";
@@ -27,6 +31,12 @@ export const ledgerEntry = pgTable(
   "ledger_entry",
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    // Denormalized owner, always copied from account.user_id in ledger-write:
+    // keeps owner-scoped queries (the hot path) join-free and RLS-ready.
+    // v1 forbids cross-user transfers, so a single owner per entry is unambiguous.
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "restrict" }),
     kind: ledgerEntryKindEnum("kind").notNull(),
     status: ledgerEntryStatusEnum("status").notNull(),
     // ALWAYS POSITIVE integer centavos (MXN).
@@ -63,10 +73,13 @@ export const ledgerEntry = pgTable(
       "chk_no_self_transfer",
       sql`${t.toAccountId} IS NULL OR ${t.toAccountId} <> ${t.accountId}`
     ),
-    // Saldo derivado y reconciliación: query más frecuente
-    index("idx_ledger_entry_account_status").on(t.accountId, t.status),
+    // Saldo derivado y reconciliación: query más frecuente, siempre bajo scoping
+    // por dueño; el sufijo (account_id, status) sigue cubriendo queries sin user_id
+    index("idx_ledger_entry_user_account_status").on(t.userId, t.accountId, t.status),
     // Historial por fecha y cálculo de estado de cuenta de crédito
     index("idx_ledger_entry_occurred_at").on(t.occurredAt),
+    // Historial del usuario por fecha (dashboard, reportes)
+    index("idx_ledger_entry_user_occurred_at").on(t.userId, t.occurredAt),
     // Lookup del lado receptor en transferencias
     index("idx_ledger_entry_to_account")
       .on(t.toAccountId)
@@ -86,6 +99,11 @@ export const ledgerEntry = pgTable(
     index("idx_ledger_entry_expense_category")
       .on(t.expenseCategoryId)
       .where(sql`${t.expenseCategoryId} IS NOT NULL`),
+    pgPolicy("ledger_entry_select_mcp_readonly", {
+      for: "select",
+      to: mcpReadonly,
+      using: sql`true`,
+    }),
   ]
 );
 

@@ -4,6 +4,9 @@ export default defineConfig({
   schema: "./src/data/schema",
   out: "./drizzle",
   dialect: "postgresql",
+  // auth.users is declared in the schema only as an FK target; Supabase owns it.
+  // Restricting drizzle-kit to public keeps it from ever generating DDL for auth.
+  schemaFilter: ["public"],
   dbCredentials: {
     // DATABASE_URL_MIGRATE points to the Session Pooler (postgres user): the Direct
     // Connection URL is IPv6-only and unreachable on this network. Fine for this

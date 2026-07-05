@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { getDashboard } from "@/app/actions/ledger";
+import { logOutAction } from "@/app/actions/auth";
+import { requireSessionUser } from "@/data/auth-repo";
 import { db } from "@/data/db";
 import { account } from "@/data/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { CaptureForm } from "@/app/components/CaptureForm";
 import { format } from "@/domain/money";
 import { money } from "@/domain/money";
@@ -16,9 +18,13 @@ function formatMXN(pesos: number) {
 }
 
 export default async function Home() {
+  const sessionUser = await requireSessionUser();
   const [dashboard, accounts, incomeCategories, expenseCategories] = await Promise.all([
     getDashboard(),
-    db.select().from(account).where(eq(account.isActive, true)),
+    db
+      .select()
+      .from(account)
+      .where(and(eq(account.userId, sessionUser.userId), eq(account.isActive, true))),
     listActiveIncomeCategories(),
     listActiveExpenseCategories(),
   ]);
@@ -27,7 +33,7 @@ export default async function Home() {
     <main className="mx-auto max-w-2xl p-8 space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Perfin</h1>
-        <nav className="flex gap-4 text-sm text-blue-600">
+        <nav className="flex items-center gap-4 text-sm text-blue-600">
           <Link href="/accounts" className="hover:underline">
             Cuentas →
           </Link>
@@ -37,6 +43,13 @@ export default async function Home() {
           <Link href="/categories" className="hover:underline">
             Categorías →
           </Link>
+          <span className="text-gray-400">|</span>
+          <span className="text-gray-500">{sessionUser.displayName}</span>
+          <form action={logOutAction}>
+            <button type="submit" className="text-gray-500 hover:underline">
+              Salir
+            </button>
+          </form>
         </nav>
       </div>
 

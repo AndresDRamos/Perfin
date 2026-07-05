@@ -8,6 +8,7 @@
 erDiagram
     account {
         integer id PK "GENERATED ALWAYS AS IDENTITY"
+        uuid user_id FK "NOT NULL, owner, immutable, ON DELETE RESTRICT"
         varchar name "NOT NULL, max 100"
         account_kind kind "NOT NULL"
         integer opening_balance "NOT NULL, default 0"
@@ -40,6 +41,7 @@ erDiagram
 
     ledger_entry {
         integer id PK "GENERATED ALWAYS AS IDENTITY"
+        uuid user_id FK "NOT NULL, denormalized from account.user_id, ON DELETE RESTRICT"
         ledger_entry_kind kind "NOT NULL"
         ledger_entry_status status "NOT NULL"
         integer amount "NOT NULL, > 0"
@@ -55,6 +57,7 @@ erDiagram
 
     plan {
         integer id PK "GENERATED ALWAYS AS IDENTITY"
+        uuid user_id FK "NOT NULL, ON DELETE CASCADE"
         varchar name "NOT NULL, max 100"
         date period_start "NOT NULL"
         date period_end "NOT NULL, >= period_start"
@@ -75,6 +78,37 @@ erDiagram
         timestamptz created_at "NOT NULL, default now()"
     }
 
+    profile {
+        uuid user_id PK "FK auth.users.id, ON DELETE CASCADE"
+        varchar username "NOT NULL, max 30, lower ci unique"
+        varchar display_name "NOT NULL, max 100"
+        varchar login_email "NOT NULL, max 255, lower ci unique"
+        boolean has_real_email "NOT NULL, default false"
+        timestamptz created_at "NOT NULL, default now()"
+        timestamptz updated_at "NOT NULL, default now()"
+    }
+
+    space {
+        integer id PK "GENERATED ALWAYS AS IDENTITY"
+        varchar name "NOT NULL, max 100"
+        uuid created_by FK "nullable, ON DELETE SET NULL, informational"
+        timestamptz created_at "NOT NULL, default now()"
+    }
+
+    space_member {
+        integer space_id PK,FK "ON DELETE CASCADE"
+        uuid user_id PK,FK "ON DELETE CASCADE"
+        space_role role "NOT NULL, default member"
+        timestamptz joined_at "NOT NULL, default now()"
+    }
+
+    space_account {
+        integer space_id PK,FK "ON DELETE CASCADE"
+        integer account_id PK,FK "ON DELETE CASCADE"
+        uuid shared_by FK "NOT NULL, member who exposed the account"
+        timestamptz shared_at "NOT NULL, default now()"
+    }
+
     account ||--o{ ledger_entry : "account_id (source)"
     account ||--o{ ledger_entry : "to_account_id (transfer dest)"
     income_category ||--o{ ledger_entry : "income_category_id"
@@ -82,6 +116,13 @@ erDiagram
     plan ||--o{ budget : "plan_id (cascade)"
     expense_category ||--o{ budget : "expense_category_id (category_cap)"
     account ||--o{ budget : "account_id (savings_reservation)"
+    profile ||--o| profile : "1:1 with auth.users (external)"
+    profile ||--o{ account : "auth.users.id -> account.user_id (external)"
+    profile ||--o{ plan : "auth.users.id -> plan.user_id (external)"
+    profile ||--o{ ledger_entry : "auth.users.id -> ledger_entry.user_id (external)"
+    space ||--o{ space_member : "space_id (cascade)"
+    space ||--o{ space_account : "space_id (cascade)"
+    account ||--o{ space_account : "account_id (cascade)"
 ```
 
 <!-- END GENERATED: erd -->
@@ -91,9 +132,29 @@ erDiagram
 - Enums: `account_kind` = (cash, debit, investment, credit); `ledger_entry_kind` =
   (income, expense, transfer); `ledger_entry_status` = (cleared, projected);
   `budget_subtype` = (category_cap, savings_reservation, purchase_goal);
-  `purchase_horizon` = (short, medium, long).
-- All foreign keys use `ON DELETE no action ON UPDATE no action`, except `budget.plan_id` →
-  `plan` which is `ON DELETE cascade`.
+  `purchase_horizon` = (short, medium, long); `space_role` = (owner, member).
+- All foreign keys use `ON DELETE no action ON UPDATE no action`, except: `budget.plan_id` →
+  `plan` (`cascade`); `account.user_id` → `auth.users` (`restrict`); `plan.user_id` →
+  `auth.users` (`cascade`); `ledger_entry.user_id` → `auth.users` (`restrict`);
+  `profile.user_id` → `auth.users` (`cascade`); `space.created_by` → `auth.users` (`set null`);
+  `space_member.*` → `space`/`auth.users` (`cascade`); `space_account.space_id`/`account_id` →
+  `space`/`account` (`cascade`).
+- `auth.users` is a Supabase-managed table outside `public` (declared in Drizzle only so
+  `public` tables can FK to it; `drizzle-kit` never manages it — see `schemaFilter: ["public"]`
+  in `drizzle.config.ts`). The `profile ||--o{ ...` edges above are drawn from `profile` as a
+  stand-in for `auth.users` since Mermaid can't reference an external table directly; the real FK
+  target is always `auth.users.id`, not `profile.user_id`.
+- A `space` is a **visibility overlay**, never an owner: `account.user_id` is the sole owner of an
+  account and is immutable after creation. `space_account` only records that a member exposed one
+  of their accounts to a space; a space's balance is the sum of its exposed accounts' balances.
+- `ledger_entry.user_id` is denormalized from `account.user_id`, copied at write time by
+  `ledger-write` (not by a DB trigger — the schema stays declarative). Cross-user transfers
+  (`to_account_id` owned by a different user) are rejected in `ledger-write`, not by a DB
+  constraint.
+- RLS is enabled on all 10 `public` tables but **no per-user policies exist yet** — isolation is
+  enforced entirely in the server-action/repo layer (`WHERE user_id = session.userId`). Every
+  table has exactly one policy, `<table>_select_mcp_readonly FOR SELECT USING (true)`, scoped to
+  the `mcp_readonly` role used by the `db` MCP.
 - A `budget` is polymorphic by `subtype` (enforced by `chk_budget_subtype_fields`):
   `category_cap` sets `expense_category_id`; `savings_reservation` sets `account_id`;
   `purchase_goal` sets `item_name` + `horizon`. The other subtype-specific columns stay NULL.
@@ -106,4 +167,7 @@ erDiagram
 - `income_category_id` and `expense_category_id` are mutually exclusive by entry kind (enforced by
   `chk_category_kind`). Transfer entries leave both NULL.
 - `expense_category` has at most one row with `is_savings = true` (partial unique index
-  `expense_category_savings_singleton`).
+  `expense_category_savings_singleton`). Categories are global catalogs (no `user_id`).
+- `profile.login_email` mirrors `auth.users.email` — the value actually passed to
+  `signInWithPassword`. It is synthetic (`<username>@users.perfin.internal`,
+  `has_real_email = false`) when the user registered without a real email.
