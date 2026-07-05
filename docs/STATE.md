@@ -32,8 +32,21 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   inmutables tras creación. Diferidos a plan propio: `currency` (v1 mono-moneda MXN) y
   `account_interest_rate`. De paso: lint reparado (Next 16 flat config), pool de `db.ts` acotado
   con singleton dev, journal drizzle re-sincronizado, migraciones vía pooler en `.env`.
+- **Auth + spaces** (`auth-spaces`, built, pending verify) -- Supabase Auth como motor (ADR-006);
+  login por username o correo resuelto server-side a `login_email` (sintético si el usuario no dio
+  correo). Migración `0004_marvelous_tigra` aplicada: tabla `profile`; `account`/`plan`/
+  `ledger_entry` ganan `user_id` (denormalizado en `ledger_entry`, inmutable en `account` por
+  convención de app); esquema de espacios compartidos (`space`, `space_member`, `space_account`,
+  ADR-007) vive en DB pero **sin capa de aplicación todavía** -- ver "Fuera de alcance" en
+  `docs/plans/auth-spaces.md`. RLS habilitado en las 10 tablas de `public` (hallazgo: ya estaba
+  activo desde el dashboard de Supabase con 0 policies, lo que dejaba ciego al MCP `db`); cada
+  tabla ahora declara `pgPolicy` de solo-lectura para `mcp_readonly`. Categorías siguen siendo
+  catálogo global (sin `user_id`). Flujo verificado manualmente: registro sin correo, login por
+  username, ruta protegida.
 - **Next**: fixed expenses (`fixed_expense` table + recurrence engine) via `/plan-module` or
-  `/ship-module`.
+  `/ship-module`. También pendientes (fuera de este plan): gestión de espacios (crear/invitar/
+  exponer cuentas), onboarding wizard de alta de cuentas, dashboard visual del patrimonio, marca de
+  cuenta de nómina + proyección de próximo ingreso (ver visión en memoria del usuario).
 
 ## Active risks
 
@@ -45,6 +58,16 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   module is still `building` until that lands.
 - **Savings tracking is manual**: `savings_reservation` budgets only track transfers the user
   records into the destination account; there is no automatic money movement or enforcement.
+- **RLS habilitado pero sin policies por usuario**: el aislamiento real entre usuarios vive en la
+  capa de server actions/repos (`WHERE user_id = session.userId` explícito), no en Postgres. La
+  app conecta con credenciales de servicio fijas vía el pooler, así que `auth.uid()` no se puede
+  usar sin propagar el JWT por transacción (`SET LOCAL`) -- trabajo de infraestructura diferido a
+  un plan futuro de "RLS como defensa en profundidad". Cualquier query de dominio nueva debe
+  filtrar por `user_id` explícitamente o queda expuesta entre usuarios.
+- **Espacios sin capa de aplicación**: las tablas `space`/`space_member`/`space_account` existen
+  en DB (ADR-007) pero no hay `space-write.ts`/`space-repo.ts` ni UI -- los invariantes ("al menos
+  un owner", "cuenta expuesta solo si el dueño es miembro") no están enforced todavía en ningún
+  lado.
 
 ## Active logic
 
