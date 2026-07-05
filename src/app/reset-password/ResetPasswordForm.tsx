@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { logInAction } from "@/app/actions/auth";
+import { resetPasswordAction } from "@/app/actions/auth";
 import { PasswordInput } from "@/app/components/PasswordInput";
 
 interface FormState {
@@ -11,46 +11,40 @@ interface FormState {
 }
 
 async function submit(_prev: FormState, formData: FormData): Promise<FormState> {
-  return logInAction({
-    identifier: formData.get("identifier"),
+  return resetPasswordAction({
     password: formData.get("password"),
+    passwordConfirm: formData.get("passwordConfirm"),
   });
 }
 
-export function LoginForm() {
+// Reached from the recovery link (/auth/confirm?intent=recovery just set the
+// recovery session). Without that session the action fails with a clear
+// "link expired" message rather than silently doing nothing.
+export function ResetPasswordForm() {
   const [state, action, pending] = useActionState(submit, {});
 
   return (
     <form action={action} className="space-y-4 rounded-lg border p-6">
       <div>
-        <label className="block text-sm font-medium" htmlFor="identifier">
-          Usuario o correo
-        </label>
-        <input
-          id="identifier"
-          name="identifier"
-          type="text"
-          required
-          autoComplete="username"
-          className="mt-1 w-full rounded border px-3 py-2 text-sm"
-        />
-        {state.errors?.identifier && (
-          <p className="text-red-600 text-xs mt-1">{state.errors.identifier[0]}</p>
-        )}
+        <h2 className="font-medium">Nueva contraseña</h2>
+        <p className="text-sm text-gray-500 mt-1">Elige tu nueva contraseña.</p>
       </div>
 
       <PasswordInput
         label="Contraseña"
         name="password"
-        autoComplete="current-password"
+        autoComplete="new-password"
+        minLength={8}
         error={state.errors?.password?.[0]}
       />
 
-      <div className="text-right">
-        <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
-          ¿Olvidaste tu contraseña?
-        </Link>
-      </div>
+      <PasswordInput
+        label="Confirmar contraseña"
+        name="passwordConfirm"
+        autoComplete="new-password"
+        minLength={8}
+        error={state.errors?.passwordConfirm?.[0]}
+      />
 
       {state.errors?._form && (
         <p className="text-red-600 text-sm">{state.errors._form[0]}</p>
@@ -61,13 +55,12 @@ export function LoginForm() {
         disabled={pending}
         className="w-full rounded bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
       >
-        {pending ? "Entrando…" : "Entrar"}
+        {pending ? "Guardando…" : "Guardar contraseña"}
       </button>
 
       <p className="text-center text-sm text-gray-500">
-        ¿No tienes cuenta?{" "}
-        <Link href="/register" className="text-blue-600 hover:underline">
-          Regístrate
+        <Link href="/forgot-password" className="text-blue-600 hover:underline">
+          Solicitar un enlace nuevo
         </Link>
       </p>
     </form>
