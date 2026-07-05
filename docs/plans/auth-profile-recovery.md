@@ -1,6 +1,6 @@
 # auth-profile-recovery - Correo post-registro, recuperación de contraseña y perfil
 
-- Status: verified
+- Status: committed
 - Date: 2026-07-04
 - Mode: Review
 
