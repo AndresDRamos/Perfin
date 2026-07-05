@@ -32,21 +32,35 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   inmutables tras creación. Diferidos a plan propio: `currency` (v1 mono-moneda MXN) y
   `account_interest_rate`. De paso: lint reparado (Next 16 flat config), pool de `db.ts` acotado
   con singleton dev, journal drizzle re-sincronizado, migraciones vía pooler en `.env`.
-- **Auth + spaces** (`auth-spaces`, built, pending verify) -- Supabase Auth como motor (ADR-006);
-  login por username o correo resuelto server-side a `login_email` (sintético si el usuario no dio
-  correo). Migración `0004_marvelous_tigra` aplicada: tabla `profile`; `account`/`plan`/
-  `ledger_entry` ganan `user_id` (denormalizado en `ledger_entry`, inmutable en `account` por
-  convención de app); esquema de espacios compartidos (`space`, `space_member`, `space_account`,
-  ADR-007) vive en DB pero **sin capa de aplicación todavía** -- ver "Fuera de alcance" en
-  `docs/plans/auth-spaces.md`. RLS habilitado en las 10 tablas de `public` (hallazgo: ya estaba
-  activo desde el dashboard de Supabase con 0 policies, lo que dejaba ciego al MCP `db`); cada
-  tabla ahora declara `pgPolicy` de solo-lectura para `mcp_readonly`. Categorías siguen siendo
-  catálogo global (sin `user_id`). Flujo verificado manualmente: registro sin correo, login por
-  username, ruta protegida.
-- **Next**: fixed expenses (`fixed_expense` table + recurrence engine) via `/plan-module` or
-  `/ship-module`. También pendientes (fuera de este plan): gestión de espacios (crear/invitar/
-  exponer cuentas), onboarding wizard de alta de cuentas, dashboard visual del patrimonio, marca de
-  cuenta de nómina + proyección de próximo ingreso (ver visión en memoria del usuario).
+- **Auth + spaces** (`auth-spaces`, complete) -- Supabase Auth como motor (ADR-006); login por
+  username o correo resuelto server-side a `login_email` (sintético si el usuario no dio correo).
+  Migración `0004_marvelous_tigra` aplicada: tabla `profile`; `account`/`plan`/`ledger_entry` ganan
+  `user_id` (denormalizado en `ledger_entry`, inmutable en `account` por convención de app);
+  esquema de espacios compartidos (`space`, `space_member`, `space_account`, ADR-007) vive en DB
+  pero **sin capa de aplicación todavía** -- gestión de espacios queda para un plan propio. RLS
+  habilitado en las 10 tablas de `public` (hallazgo: ya estaba activo desde el dashboard de
+  Supabase con 0 policies, lo que dejaba ciego al MCP `db`); cada tabla declara `pgPolicy` de
+  solo-lectura para `mcp_readonly`. Categorías siguen siendo catálogo global (sin `user_id`).
+- **Auth: perfil, correo y recuperación** (`auth-profile-recovery`, complete) -- ADR-008. Un solo
+  nombre: `profile.display_name` eliminado (migración `0005`, irreversible; el username es el
+  único nombre visible). `profile.email_verified_at` (nullable, app-owned: `auth.users.
+  email_confirmed_at` ya no prueba posesión porque el alta fuerza `email_confirm: true`) +
+  CHECKs `chk_email_verified_real` / `chk_login_email_domain` (migración `0006`). Ciclo de correo
+  completo: verificación por posesión (magic link), añadir/cambiar correo (confirmación al correo
+  nuevo, "Secure email change" debe estar OFF en el dashboard -- **pendiente de configurar**),
+  recuperación de contraseña (solo cuentas con correo real, respuesta siempre genérica) vía
+  `/auth/confirm` (un solo route handler para los tres flujos) + auto-reparación del espejo
+  `login_email` en `getSessionUser`. UI: registro con confirmación de contraseña, `PasswordInput`
+  con toggle ver/ocultar (registro/login/reset/cambio), `/profile` (username, estado de correo,
+  cambio de contraseña), `/forgot-password`, `/reset-password`. Verificado manualmente en preview
+  móvil (375px) + build/lint/tests; **no verificado de punta a punta** (requiere la config
+  pendiente del dashboard Supabase). Toda UI del proyecto es **mobile-first** desde este plan
+  (`CLAUDE.md`).
+- **Next**: onboarding wizard (alta de cuentas guiada) + dashboard visual del patrimonio +
+  branding (paleta, iconos Iconify por tipo de cuenta, ícono de marca -- specs en memoria del
+  usuario). También pendientes: fixed expenses (`fixed_expense` table + recurrence engine),
+  gestión de espacios (crear/invitar/exponer cuentas), marca de cuenta de nómina + proyección de
+  próximo ingreso (ver visión en memoria del usuario).
 
 ## Active risks
 

@@ -44,7 +44,9 @@ export default async function Home() {
             Categorías →
           </Link>
           <span className="text-gray-400">|</span>
-          <span className="text-gray-500">{sessionUser.displayName}</span>
+          <Link href="/profile" className="text-gray-500 hover:underline">
+            {sessionUser.username}
+          </Link>
           <form action={logOutAction}>
             <button type="submit" className="text-gray-500 hover:underline">
               Salir

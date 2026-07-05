@@ -1,0 +1,3 @@
+ALTER TABLE "profile" ADD COLUMN "email_verified_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "profile" ADD CONSTRAINT "chk_email_verified_real" CHECK ("profile"."email_verified_at" IS NULL OR "profile"."has_real_email");--> statement-breakpoint
+ALTER TABLE "profile" ADD CONSTRAINT "chk_login_email_domain" CHECK (("profile"."has_real_email" AND "profile"."login_email" NOT LIKE '%@users.perfin.internal') OR (NOT "profile"."has_real_email" AND "profile"."login_email" LIKE '%@users.perfin.internal'));

@@ -80,10 +80,10 @@ erDiagram
 
     profile {
         uuid user_id PK "FK auth.users.id, ON DELETE CASCADE"
-        varchar username "NOT NULL, max 30, lower ci unique"
-        varchar display_name "NOT NULL, max 100"
+        varchar username "NOT NULL, max 30, lower ci unique, only visible name"
         varchar login_email "NOT NULL, max 255, lower ci unique"
         boolean has_real_email "NOT NULL, default false"
+        timestamptz email_verified_at "nullable, app-owned mailbox-possession proof"
         timestamptz created_at "NOT NULL, default now()"
         timestamptz updated_at "NOT NULL, default now()"
     }

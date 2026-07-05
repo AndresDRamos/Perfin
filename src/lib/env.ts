@@ -9,6 +9,9 @@ const envSchema = z.object({
   // Server-only — never expose to the client. Used by auth-write to create
   // users via the Admin API (email_confirm bypass for the synthetic-email path).
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY es requerida"),
+  // Base URL email links redirect back to (/auth/confirm). Must also be
+  // registered in Supabase Auth → URL Configuration → Redirect URLs.
+  NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3000"),
 });
 
 // Validated at import time — server-side only. Never import from client components.

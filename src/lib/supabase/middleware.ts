@@ -1,7 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/register"];
+// /auth/confirm, /forgot-password and /reset-password must stay reachable
+// without a session: they ARE the way back in when the user lost theirs.
+const PUBLIC_PATHS = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/auth/confirm",
+];
 
 function isPublicPath(pathname: string): boolean {
   return (

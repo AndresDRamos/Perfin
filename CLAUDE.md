@@ -35,6 +35,8 @@ Doc-access tracing comes from the **user-level** hook (`~/.claude/hooks/trace-do
 the repo defines no hooks of its own. Traces land in `.claude/traces/` (untracked).
 
 ## Conventions
+- **Mobile-first**: Perfin se usa principalmente en dispositivo móvil. Toda UI nueva se diseña
+  primero para viewport móvil (~390px, targets táctiles >=44px) y se verifica en ese tamaño.
 - Plans: `docs/plans/<slug>.md` -- **no number**; the slug is the identity (matches the branch
   name `<type>/<slug>`). Numeric prefixes are reserved for artifacts that accumulate forever and
   need a stable sequence: migrations (auto-numbered by Drizzle, e.g. `0004_...`) and ADRs
