@@ -5,7 +5,9 @@
 
 <!-- BEGIN GENERATED: data-dictionary -->
 
-Schema: `public`. Tables and columns are sorted alphabetically for stable diffs.
+Schema: `public`. Tables and columns are sorted alphabetically for stable diffs. `auth.users` is a
+Supabase-managed table outside `public`; it is referenced by FK from several tables below but not
+documented here as a first-class entity.
 
 ## Enums
 
@@ -16,11 +18,24 @@ Schema: `public`. Tables and columns are sorted alphabetically for stable diffs.
 | `ledger_entry_kind` | income, expense, transfer |
 | `ledger_entry_status` | cleared, projected |
 | `purchase_horizon` | short, medium, long |
+| `space_role` | owner, member |
+
+## Row Level Security
+
+RLS is enabled on every table in `public` (`ENABLE ROW LEVEL SECURITY`). The app connects as the
+table owner and bypasses RLS entirely; there are **no per-user policies yet** (isolation lives in
+the server-action/repo layer via explicit `WHERE user_id = ...`). Every table declares exactly one
+policy, `<table>_select_mcp_readonly FOR SELECT USING (true)`, granted to the read-only role used
+by the `db` MCP (`mcp_readonly`, see `src/data/schema/roles.ts`), plus a matching
+`GRANT SELECT ... TO mcp_readonly`. Without both the policy and the grant, `mcp_readonly` sees the
+table as empty regardless of actual row count — always check `pg_policy`/`pg_policies` before
+reporting a table as empty.
 
 ## Table: `account`
 
 User accounts. The `balance` is never stored; it is derived from `opening_balance` plus cleared
-ledger entries.
+ledger entries. Ownership is per-user (`user_id`); a `space` only overlays *visibility* via
+`space_account`, it never owns the account.
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -36,10 +51,13 @@ ledger entries.
 | `number` | varchar(30) | YES | | | Masked identifier; NEVER a full PAN (rejected by `chk_number_masked`). |
 | `opening_balance` | integer | NO | | `0` | Seeds the derived balance. |
 | `payment_day` | integer | YES | | | Credit accounts only; range 1-28. |
+| `user_id` | uuid | NO | FK | | FK → `auth.users.id`, ON DELETE RESTRICT; owner of the account, immutable after creation. |
 
 Constraints:
 
 - `account_pkey` — PRIMARY KEY (`id`).
+- `account_user_id_users_id_fk` — FK (`user_id`) → `auth.users(id)`, ON DELETE RESTRICT, ON UPDATE
+  no action.
 - `chk_credit_fields` — credit accounts must set `cutoff_day` and `payment_day`; non-credit must
   leave `cutoff_day`, `payment_day`, and `credit_limit` NULL.
 - `chk_cutoff_day_range` — `cutoff_day` BETWEEN 1 AND 28.
@@ -53,6 +71,9 @@ Indexes:
 
 - `account_pkey` — UNIQUE btree (`id`).
 - `idx_account_is_active` — btree (`is_active`) WHERE `is_active = true`.
+- `idx_account_user_id` — btree (`user_id`).
+
+RLS: enabled; policy `account_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_readonly`.
 
 ## Table: `budget`
 
@@ -60,7 +81,7 @@ A single budget within a `plan`. Polymorphic by `subtype`: `category_cap` (plann
 `expense_category`), `savings_reservation` (earmark into a destination `account`), or `purchase_goal`
 (named target with a horizon). The `chk_budget_subtype_fields` matrix is fail-closed: only the
 columns for the active subtype may be set; all others must be NULL. Actuals are derived from the
-ledger, never stored.
+ledger, never stored. No `user_id` of its own — ownership is inherited via `plan_id`.
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -104,10 +125,13 @@ Indexes:
   `expense_category_id IS NOT NULL`.
 - `idx_budget_account` — btree (`account_id`) WHERE `account_id IS NOT NULL`.
 
+RLS: enabled; policy `budget_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_readonly`.
+
 ## Table: `expense_category`
 
 Expense classification catalog. One reserved row has `is_savings = true` (the "Ahorro" category);
-enforced as a singleton by a partial unique index.
+enforced as a singleton by a partial unique index. Global (no `user_id`): categories are
+classification metadata, not per-user financial data.
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -129,9 +153,12 @@ Indexes:
 - `expense_category_savings_singleton` — UNIQUE btree (`is_savings`) WHERE `is_savings = true`.
 - `idx_expense_category_is_active` — btree (`is_active`) WHERE `is_active = true`.
 
+RLS: enabled; policy `expense_category_select_mcp_readonly` FOR SELECT USING (true) TO
+`mcp_readonly`.
+
 ## Table: `income_category`
 
-Income classification catalog.
+Income classification catalog. Global (no `user_id`), same rationale as `expense_category`.
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -151,11 +178,15 @@ Indexes:
 - `income_category_name_lower_uq` — UNIQUE btree (`lower(name)`).
 - `idx_income_category_is_active` — btree (`is_active`) WHERE `is_active = true`.
 
+RLS: enabled; policy `income_category_select_mcp_readonly` FOR SELECT USING (true) TO
+`mcp_readonly`.
+
 ## Table: `ledger_entry`
 
 Transaction ledger; single source of truth for balances. Records income, expense, and transfer
 entries, each projected or cleared. Category FKs are mutually exclusive by kind (enforced by
-`chk_category_kind`).
+`chk_category_kind`). `user_id` is denormalized from `account.user_id` (copied by `ledger-write` on
+insert) to avoid joins on the hot path and to prepare for future per-user RLS policies.
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -171,6 +202,7 @@ entries, each projected or cleared. Category FKs are mutually exclusive by kind 
 | `status` | ledger_entry_status | NO | | | Enum: cleared, projected. |
 | `to_account_id` | integer | YES | FK | | FK → `account.id`; set only for transfers. |
 | `updated_at` | timestamptz | NO | | `now()` | |
+| `user_id` | uuid | NO | FK | | FK → `auth.users.id`, ON DELETE RESTRICT; denormalized from `account.user_id` at write time. Cross-user transfers are rejected in `ledger-write`, not by a DB constraint. |
 
 Constraints:
 
@@ -183,6 +215,8 @@ Constraints:
   `income_category(id)`, ON DELETE no action, ON UPDATE no action.
 - `ledger_entry_to_account_id_account_id_fk` — FK (`to_account_id`) → `account(id)`, ON DELETE no
   action, ON UPDATE no action.
+- `ledger_entry_user_id_users_id_fk` — FK (`user_id`) → `auth.users(id)`, ON DELETE RESTRICT,
+  ON UPDATE no action.
 - `chk_amount_positive` — `amount > 0`.
 - `chk_category_kind` — income entries must have `expense_category_id` NULL; expense entries must
   have `income_category_id` NULL; transfer entries must have both NULL.
@@ -193,7 +227,9 @@ Constraints:
 Indexes:
 
 - `ledger_entry_pkey` — UNIQUE btree (`id`).
-- `idx_ledger_entry_account_status` — btree (`account_id`, `status`).
+- `idx_ledger_entry_user_account_status` — btree (`user_id`, `account_id`, `status`). Replaces the
+  former `idx_ledger_entry_account_status` (dropped in `0004_marvelous_tigra`).
+- `idx_ledger_entry_user_occurred_at` — btree (`user_id`, `occurred_at`).
 - `idx_ledger_entry_expense_category` — btree (`expense_category_id`) WHERE
   `expense_category_id IS NOT NULL`.
 - `idx_ledger_entry_income_category` — btree (`income_category_id`) WHERE
@@ -201,10 +237,13 @@ Indexes:
 - `idx_ledger_entry_occurred_at` — btree (`occurred_at`).
 - `idx_ledger_entry_to_account` — btree (`to_account_id`) WHERE `to_account_id IS NOT NULL`.
 
+RLS: enabled; policy `ledger_entry_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_readonly`.
+
 ## Table: `plan`
 
 A planning container holding budgets over an arbitrary date range (not restricted to calendar
-months).
+months). Owned per-user; deleting the user cascades its plans (and their budgets, via
+`budget.plan_id` cascade).
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -213,14 +252,136 @@ months).
 | `name` | varchar(100) | NO | | | |
 | `period_end` | date | NO | | | Must be `>= period_start`. |
 | `period_start` | date | NO | | | |
+| `user_id` | uuid | NO | FK | | FK → `auth.users.id`, ON DELETE CASCADE; plans are disposable. |
 
 Constraints:
 
 - `plan_pkey` — PRIMARY KEY (`id`).
+- `plan_user_id_users_id_fk` — FK (`user_id`) → `auth.users(id)`, ON DELETE CASCADE, ON UPDATE no
+  action.
 - `chk_plan_period_order` — `period_end >= period_start`.
 
 Indexes:
 
 - `plan_pkey` — UNIQUE btree (`id`).
+- `idx_plan_user_id` — btree (`user_id`).
+
+RLS: enabled; policy `plan_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_readonly`.
+
+## Table: `profile`
+
+1:1 extension of `auth.users`: the auth user IS the identity, `profile` adds the app-facing
+attributes (username, display name, login email resolution). `login_email` mirrors
+`auth.users.email` — the value actually passed to `signInWithPassword`; it is synthetic
+(`<username>@users.perfin.internal`) when the user registered without a real email
+(`has_real_email = false`).
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `created_at` | timestamptz | NO | | `now()` | |
+| `display_name` | varchar(100) | NO | | | |
+| `has_real_email` | boolean | NO | | `false` | `false` when `login_email` is the synthetic fallback. |
+| `login_email` | varchar(255) | NO | | | Case-insensitive unique via `lower(login_email)` index; mirror of `auth.users.email`. |
+| `updated_at` | timestamptz | NO | | `now()` | |
+| `user_id` | uuid | NO | PK, FK | | FK → `auth.users.id`, ON DELETE CASCADE. |
+| `username` | varchar(30) | NO | | | Lowercase alphanumerics + `_`, 3-30 chars (`chk_username_format`); case-insensitive unique via `lower(username)` index. |
+
+Constraints:
+
+- `profile_pkey` — PRIMARY KEY (`user_id`).
+- `profile_user_id_users_id_fk` — FK (`user_id`) → `auth.users(id)`, ON DELETE CASCADE, ON UPDATE
+  no action.
+- `chk_username_format` — `username ~ '^[a-z0-9_]{3,30}$'`.
+
+Indexes:
+
+- `profile_pkey` — UNIQUE btree (`user_id`).
+- `profile_username_lower_uq` — UNIQUE btree (`lower(username)`).
+- `profile_login_email_lower_uq` — UNIQUE btree (`lower(login_email)`).
+
+RLS: enabled; policy `profile_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_readonly`.
+
+## Table: `space`
+
+A visibility overlay over accounts (never their owner). A space's balance is the sum of the
+accounts exposed to it via `space_account`.
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `created_at` | timestamptz | NO | | `now()` | |
+| `created_by` | uuid | YES | FK | | FK → `auth.users.id`, ON DELETE SET NULL; informational metadata only, does not block deleting the creator. |
+| `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `name` | varchar(100) | NO | | | |
+
+Constraints:
+
+- `space_pkey` — PRIMARY KEY (`id`).
+- `space_created_by_users_id_fk` — FK (`created_by`) → `auth.users(id)`, ON DELETE SET NULL,
+  ON UPDATE no action.
+
+Indexes:
+
+- `space_pkey` — UNIQUE btree (`id`).
+
+RLS: enabled; policy `space_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_readonly`.
+
+## Table: `space_account`
+
+Join table: "member X exposes account Y to space Z". Pure visibility — ownership always stays on
+`account.user_id`. Invariant enforced in `space-write` (not by trigger/DB constraint): the
+account's owner must be a member of the space; leaving a space removes the member's rows here.
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `account_id` | integer | NO | PK, FK | | FK → `account.id`, ON DELETE CASCADE. |
+| `shared_at` | timestamptz | NO | | `now()` | |
+| `shared_by` | uuid | NO | FK | | FK → `auth.users.id`; the member who exposed the account. |
+| `space_id` | integer | NO | PK, FK | | FK → `space.id`, ON DELETE CASCADE. |
+
+Constraints:
+
+- `space_account_space_id_account_id_pk` — PRIMARY KEY (`space_id`, `account_id`).
+- `space_account_space_id_space_id_fk` — FK (`space_id`) → `space(id)`, ON DELETE cascade,
+  ON UPDATE no action.
+- `space_account_account_id_account_id_fk` — FK (`account_id`) → `account(id)`, ON DELETE cascade,
+  ON UPDATE no action.
+- `space_account_shared_by_users_id_fk` — FK (`shared_by`) → `auth.users(id)`, ON DELETE no action,
+  ON UPDATE no action.
+
+Indexes:
+
+- `space_account_space_id_account_id_pk` — UNIQUE btree (`space_id`, `account_id`).
+- `idx_space_account_account_id` — btree (`account_id`). Supports "which spaces expose this
+  account" lookups (e.g. when deactivating an account).
+
+RLS: enabled; policy `space_account_select_mcp_readonly` FOR SELECT USING (true) TO
+`mcp_readonly`.
+
+## Table: `space_member`
+
+Join table: membership of a user in a space, with a role.
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `joined_at` | timestamptz | NO | | `now()` | |
+| `role` | space_role | NO | | `'member'` | Enum: owner, member. |
+| `space_id` | integer | NO | PK, FK | | FK → `space.id`, ON DELETE CASCADE. |
+| `user_id` | uuid | NO | PK, FK | | FK → `auth.users.id`, ON DELETE CASCADE. |
+
+Constraints:
+
+- `space_member_space_id_user_id_pk` — PRIMARY KEY (`space_id`, `user_id`).
+- `space_member_space_id_space_id_fk` — FK (`space_id`) → `space(id)`, ON DELETE cascade,
+  ON UPDATE no action.
+- `space_member_user_id_users_id_fk` — FK (`user_id`) → `auth.users(id)`, ON DELETE cascade,
+  ON UPDATE no action.
+
+Indexes:
+
+- `space_member_space_id_user_id_pk` — UNIQUE btree (`space_id`, `user_id`).
+- `idx_space_member_user_id` — btree (`user_id`). Supports "which spaces does this user belong to"
+  lookups.
+
+RLS: enabled; policy `space_member_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_readonly`.
 
 <!-- END GENERATED: data-dictionary -->

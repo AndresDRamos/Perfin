@@ -2,6 +2,55 @@
 
 > Append-only. Each entry: date, what changed, and why. `docs-sync` appends; history is never rewritten.
 
+## 2026-07-04 — `0004_marvelous_tigra` (auth + spaces: user identity and visibility overlay)
+
+- Declared external `auth.users` (Supabase-managed, `pgSchema("auth")`) purely so `public` tables
+  can FK to it; `drizzle-kit` never manages it (`schemaFilter: ["public"]` in `drizzle.config.ts`).
+  Generation gotcha: `db:generate` still emitted `CREATE SCHEMA "auth"` / `CREATE TABLE
+  "auth"."users"`; removed by hand from the applied SQL (kept only in the snapshot to resolve FKs).
+- Created table `profile`: PK `user_id uuid` → FK `auth.users(id)` ON DELETE CASCADE (1:1 with the
+  auth user); `username` varchar(30) NOT NULL with `chk_username_format`
+  (`^[a-z0-9_]{3,30}$`) and case-insensitive unique index; `display_name` varchar(100) NOT NULL;
+  `login_email` varchar(255) NOT NULL, case-insensitive unique (mirror of `auth.users.email`, used
+  for `signInWithPassword`; synthetic `<username>@users.perfin.internal` when no real email was
+  given); `has_real_email` boolean NOT NULL default false; `created_at`/`updated_at`.
+- Created table `space`: identity PK; `name` varchar(100) NOT NULL; `created_by uuid` **nullable**
+  → FK `auth.users` ON DELETE SET NULL (informational metadata only — doesn't block deleting the
+  creator). A space is a visibility overlay over accounts, never their owner.
+- Created enum `space_role` (`owner`, `member`) and table `space_member`: composite PK
+  (`space_id`, `user_id`), both FKs ON DELETE CASCADE; `role` NOT NULL default `member`; index
+  `idx_space_member_user_id` (membership lookups by user).
+- Created table `space_account`: composite PK (`space_id`, `account_id`), both FKs ON DELETE
+  CASCADE; `shared_by uuid` NOT NULL → FK `auth.users`; `shared_at` timestamptz; index
+  `idx_space_account_account_id`.
+- Added `account.user_id uuid NOT NULL` → FK `auth.users(id)` ON DELETE RESTRICT (owner, immutable
+  after creation — enforced in `account-write`, not by trigger); index `idx_account_user_id`.
+- Added `plan.user_id uuid NOT NULL` → FK `auth.users(id)` ON DELETE CASCADE (plans are
+  disposable); index `idx_plan_user_id`.
+- Added `ledger_entry.user_id uuid NOT NULL` → FK `auth.users(id)` ON DELETE RESTRICT
+  (denormalized from `account.user_id`, copied at write time by `ledger-write`); dropped index
+  `idx_ledger_entry_account_status`, replaced by `idx_ledger_entry_user_account_status`
+  (`user_id`, `account_id`, `status`); added `idx_ledger_entry_user_occurred_at`
+  (`user_id`, `occurred_at`).
+- RLS: `ENABLE ROW LEVEL SECURITY` on all 10 `public` tables (codifies what was already toggled on
+  the 6 pre-existing tables outside of migrations, via the Supabase dashboard, with zero policies —
+  see below) + one policy per table, `<table>_select_mcp_readonly FOR SELECT USING (true)` scoped
+  to `pgRole("mcp_readonly").existing()` (`src/data/schema/roles.ts`), plus a hand-added
+  `GRANT SELECT ... TO mcp_readonly` on the 4 new tables (drizzle-kit does not manage grants). No
+  per-user policies yet; isolation stays in the server-action/repo layer.
+  Verified live: `pg_class.relrowsecurity = true` and a `mcp_readonly`-scoped SELECT policy exist
+  on all 10 tables (`account`, `budget`, `expense_category`, `income_category`, `ledger_entry`,
+  `plan`, `profile`, `space`, `space_account`, `space_member`); `information_schema.role_table_grants`
+  confirms the SELECT grant on all 10 for `mcp_readonly`.
+- Why: plan `auth-spaces` — Supabase Auth (login by username or email) + shared-space data model
+  (a space is a visibility overlay over accounts, never their owner). Domain tables
+  (`account`, `plan`, `budget`, `ledger_entry`) remain empty in dev post-migration — a test user
+  ("ana_ramos") signed up but has not yet created any account or transaction; this is real data
+  state, not an RLS-induced false negative (confirmed via direct row counts plus `pg_policies`).
+- Gotcha discovered during rollout (recorded for future migrations): RLS enabled with zero
+  policies makes every table look empty to any non-owner role, including `mcp_readonly` — always
+  check `pg_policy`/`pg_policies` (and the grant) before reporting a table as empty in dev.
+
 ## 2026-07-03 — `0003_mighty_young_avengers` (accounts: descriptive metadata)
 
 - Added column `account.bank` (varchar 100, nullable) — institution name, informative only.
