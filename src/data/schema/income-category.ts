@@ -2,12 +2,14 @@ import {
   boolean,
   index,
   integer,
+  pgPolicy,
   pgTable,
   timestamp,
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { mcpReadonly } from "./roles";
 
 export const incomeCategory = pgTable(
   "income_category",
@@ -21,6 +23,11 @@ export const incomeCategory = pgTable(
   (t) => [
     uniqueIndex("income_category_name_lower_uq").on(sql`lower(${t.name})`),
     index("idx_income_category_is_active").on(t.isActive).where(sql`${t.isActive} = TRUE`),
+    pgPolicy("income_category_select_mcp_readonly", {
+      for: "select",
+      to: mcpReadonly,
+      using: sql`true`,
+    }),
   ]
 );
 
