@@ -2,6 +2,38 @@
 
 > Append-only. Each entry: date, what changed, and why. `docs-sync` appends; history is never rewritten.
 
+## 2026-07-04 — `0006_fluffy_rhodey` (profile: app-owned email verification state) — applied: true
+
+- Added column `profile.email_verified_at` (timestamptz, **nullable**, no default) — app-owned
+  proof of mailbox possession; `NULL` = possession never proven. Set only when the user consumes a
+  verification or email-change link. `auth.users.email_confirmed_at` is force-sealed at signup via
+  the Admin API (`email_confirm: true`) and therefore proves nothing — see ADR-008.
+- Added CHECK `chk_email_verified_real` — `email_verified_at IS NULL OR has_real_email`: only real
+  emails can be verified; an UPDATE dropping `has_real_email` must clear `email_verified_at` in
+  the same statement or the DB rejects it.
+- Added CHECK `chk_login_email_domain` — `has_real_email` ⇔ `login_email` is NOT on the synthetic
+  domain: `(has_real_email AND login_email NOT LIKE '%@users.perfin.internal') OR
+  (NOT has_real_email AND login_email LIKE '%@users.perfin.internal')`. The flag and the synthetic
+  fallback domain can never disagree.
+- No changes to indexes, RLS policies, or `mcp_readonly` grants. Verified live post-apply: column,
+  both CHECKs, the 3 `profile` indexes, the SELECT policy, and the grant all present.
+- Why: plan `auth-profile-recovery` — email verification and account recovery need a truthful,
+  app-owned verification timestamp plus a DB-enforced invariant between `has_real_email` and the
+  login-email domain.
+
+## 2026-07-04 — `0005_wide_vulture` (profile: drop display_name) — applied: true
+
+- Dropped column `profile.display_name` (varchar 100, NOT NULL). **IRREVERSIBLE** — the values are
+  destroyed; from here on `username` is the only visible name app-wide.
+- Backup of the 3 dev-row values, taken 2026-07-04 during the dba review (also recorded as a
+  comment inside `drizzle/0005_wide_vulture.sql`):
+  - `ana_ramos` → 'Ana Ramos'
+  - `carlosperez` → 'Carlos Pérez'
+  - `aramos` → 'Andrés Ramos'
+- No changes to indexes, RLS policies, or `mcp_readonly` grants.
+- Why: plan `auth-profile-recovery` — a second free-text name added ambiguity for zero product
+  value; the username is unique, validated (`chk_username_format`) and already shown everywhere.
+
 ## 2026-07-04 — `0004_marvelous_tigra` (auth + spaces: user identity and visibility overlay)
 
 - Declared external `auth.users` (Supabase-managed, `pgSchema("auth")`) purely so `public` tables

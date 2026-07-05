@@ -271,20 +271,21 @@ RLS: enabled; policy `plan_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_
 ## Table: `profile`
 
 1:1 extension of `auth.users`: the auth user IS the identity, `profile` adds the app-facing
-attributes (username, display name, login email resolution). `login_email` mirrors
-`auth.users.email` — the value actually passed to `signInWithPassword`; it is synthetic
+attributes (username, login email resolution, email verification state). The `username` is the
+**only visible name** app-wide (`display_name` was dropped in `0005_wide_vulture`). `login_email`
+mirrors `auth.users.email` — the value actually passed to `signInWithPassword`; it is synthetic
 (`<username>@users.perfin.internal`) when the user registered without a real email
-(`has_real_email = false`).
+(`has_real_email = false`, enforced both ways by `chk_login_email_domain`).
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `created_at` | timestamptz | NO | | `now()` | |
-| `display_name` | varchar(100) | NO | | | |
-| `has_real_email` | boolean | NO | | `false` | `false` when `login_email` is the synthetic fallback. |
+| `email_verified_at` | timestamptz | YES | | | App-owned proof of mailbox possession; NULL = never proven. Set only when the user consumes a verification/email-change link — `auth.users.email_confirmed_at` is force-sealed at signup via the Admin API and proves nothing (ADR-008). Requires `has_real_email` (`chk_email_verified_real`). |
+| `has_real_email` | boolean | NO | | `false` | `false` ⇔ `login_email` is the synthetic fallback (`chk_login_email_domain`). |
 | `login_email` | varchar(255) | NO | | | Case-insensitive unique via `lower(login_email)` index; mirror of `auth.users.email`. |
 | `updated_at` | timestamptz | NO | | `now()` | |
 | `user_id` | uuid | NO | PK, FK | | FK → `auth.users.id`, ON DELETE CASCADE. |
-| `username` | varchar(30) | NO | | | Lowercase alphanumerics + `_`, 3-30 chars (`chk_username_format`); case-insensitive unique via `lower(username)` index. |
+| `username` | varchar(30) | NO | | | The only visible name app-wide. Lowercase alphanumerics + `_`, 3-30 chars (`chk_username_format`); case-insensitive unique via `lower(username)` index. |
 
 Constraints:
 
@@ -292,6 +293,11 @@ Constraints:
 - `profile_user_id_users_id_fk` — FK (`user_id`) → `auth.users(id)`, ON DELETE CASCADE, ON UPDATE
   no action.
 - `chk_username_format` — `username ~ '^[a-z0-9_]{3,30}$'`.
+- `chk_email_verified_real` — `email_verified_at IS NULL OR has_real_email` (only real emails can
+  be verified; an UPDATE dropping `has_real_email` must clear `email_verified_at` in the same
+  statement).
+- `chk_login_email_domain` — `has_real_email` ⇔ `login_email` NOT LIKE
+  `'%@users.perfin.internal'` (the flag and the synthetic domain can never disagree).
 
 Indexes:
 
