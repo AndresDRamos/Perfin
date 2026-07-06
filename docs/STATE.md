@@ -81,7 +81,31 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   "Cambiar contraseña" en perfil/cuentas/onboarding) pasaron de `text-gray-700`/`-600` (sin
   variante dark, contraste ~1.6:1 sobre el fondo oscuro) a `text-secondary-600 dark:text-
   secondary-300` -- gap real expuesto por el flip a `prefers-color-scheme` de este mismo plan.
-- **Next**: fixed expenses (`fixed_expense` table + recurrence engine). También pendientes:
+- **Tipos de plan, dashboard neto** (`plan-types-dashboard-neto`, complete) --
+  ADR-010: la tarjeta "Proyectado" del dashboard ahora es **saldo neto** (`netProjected()` =
+  proyectado líquido + saldo firmado cleared de cuentas credit), con la fórmula en su leyenda.
+  Migración `0008_shallow_ricochet` aplicada: tabla `fixed_expense` (plantilla mensual),
+  `ledger_entry` + `fixed_expense_id`/`fixed_expense_month`/`expected_amount`,
+  `expense_category.is_fixed` + seeds "Servicios"/"Subscripciones". Motor de recurrencia
+  (`src/domain/recurrence.ts` + `materializeDueFixedExpenses`): lazy al cargar dashboard y /plans,
+  materializa cada ocurrencia vencida como expense **cleared** fechada en su día programado
+  (clamp 29–31/feb), idempotente vía unique parcial + ON CONFLICT DO NOTHING. Proyecciones de
+  ingreso: `createProjection` (income projected, `expected_amount` = esperado inmutable) +
+  `reconcileWithAmount` (actualiza amount/status; la diferencia esperado vs real se deriva);
+  las vencidas salen como "Por conciliar" en el dashboard con input de monto real. /plans en tres
+  secciones (Presupuestos / Proyecciones / Fijos) con selector de tipo como primer paso del alta
+  (3 tarjetas, 390px); presupuesto con nombre opcional default y checkbox fecha única
+  (`period_start = period_end`, cero DDL). "Patrimonio por tipo" → "Patrimonio" con desglose por
+  cuenta (filas con ícono, montos en verde, total en encabezado). De paso: contraste dark-mode en
+  `PlanList`/`BudgetManager`; las fechas de la UI nueva se formatean con `timeZone: "UTC"` (la
+  medianoche UTC guardada mostraba el día anterior en TZ México — quirk heredada aún viva en
+  pantallas previas). Verificado en preview 390px (light y dark) con flujo completo real.
+  **Post-verificación (datos reales del usuario)**: el neto sumaba la deuda de tarjetas porque el
+  onboarding capturaba la deuda como `opening_balance` positivo (invirtiendo la convención de
+  saldo firmado, deuda = negativo). Fix: `OnboardingWizard`/`AccountManager` etiquetan "Deuda
+  actual" para crédito y guardan el monto negado; migración data-only
+  `0009_fix_credit_opening_sign` reparó las filas existentes (valores previos en el SQL).
+- **Next**: pendientes:
   gestión de espacios (crear/invitar/exponer cuentas), marca de cuenta de nómina + proyección de
   próximo ingreso (ver visión en memoria del usuario), configurar "Secure email change" OFF +
   Redirect URLs en el dashboard de Supabase (bloquea la verificación E2E del ciclo de correo del
@@ -93,16 +117,19 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   models *only if needed* (always derived, never authoritative state).
 - Date/timezone handling for cutoff/payment-day derivation -- `occurred_at` stored explicitly; fix a
   single TZ for v1.
-- **Deferred fixed expenses**: `fixed_expense` table and recurrence engine not yet built; catalog
-  module is still `building` until that lands.
+- **Gastos fijos se registran `cleared` automáticamente**: un cargo puede no haber ocurrido
+  (monto variable, cargo rechazado); el usuario puede editar/eliminar la entry, y si duele,
+  cambiar el motor a projected+confirm es un flag (`status` en `materializeDueFixedExpenses`).
 - **Savings tracking is manual**: `savings_reservation` budgets only track transfers the user
   records into the destination account; there is no automatic money movement or enforcement.
-- **Auditoría de contraste dark-mode pendiente fuera de auth/accounts/onboarding/dashboard**: el
-  plan `onboarding-dashboard-branding` flipó todo el body a `bg-surface`/`text-text` según
-  `prefers-color-scheme`, y corrigió los `text-gray-700`/`-600` sin variante `dark:` que quedaron
-  casi invisibles en las pantallas que toca (dashboard, cuentas, perfil, onboarding). `budgets`
-  (`BudgetManager.tsx`, `PlanList.tsx`), `catalog` (`CategoryList.tsx`) y `CaptureForm.tsx` no se
-  tocaron y probablemente tengan el mismo problema -- revisar en el próximo plan que los toque.
+- **Auditoría de contraste dark-mode pendiente en catalog/captura**: `PlanList.tsx` y
+  `BudgetManager.tsx` quedaron corregidos por el plan `plan-types-dashboard-neto`;
+  `CategoryList.tsx` y `CaptureForm.tsx` siguen sin revisarse -- hacerlo en el próximo plan que
+  los toque.
+- **Fechas a medianoche UTC se muestran un día antes en TZ México**: convención heredada de
+  `z.coerce.date` sobre inputs `type=date`. La UI nueva (proyecciones) formatea con
+  `timeZone: "UTC"`; pantallas previas (p. ej. "Vence {fecha}" de tarjetas en el dashboard) aún
+  muestran el corrimiento -- candidato a un plan corto de fechas/TZ (v1 asume un solo TZ).
 - **RLS habilitado pero sin policies por usuario**: el aislamiento real entre usuarios vive en la
   capa de server actions/repos (`WHERE user_id = session.userId` explícito), no en Postgres. La
   app conecta con credenciales de servicio fijas vía el pooler, así que `auth.uid()` no se puede

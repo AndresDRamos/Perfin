@@ -1,7 +1,7 @@
 # Module: ledger
 
 - Type: ledger
-- Status: planned
+- Status: active
 
 ## Purpose
 
@@ -13,15 +13,28 @@ projected available. Fast capture is the top priority (the user records constant
 
 <!-- schema-derived: kept in sync with docs/database/data-dictionary.md (live schema) -->
 
-- `ledger_entry` (id, kind, status, amount, concept?, occurred_at, created_at, updated_at, account_id, to_account_id?). Live in schema as of `0000_strong_smasher`. (This is the table the prose calls the "transaction" ledger.)
+- `ledger_entry` (id, user_id, kind, status, amount, concept?, occurred_at, created_at,
+  updated_at, account_id, to_account_id?, income_category_id?, expense_category_id?,
+  fixed_expense_id?, fixed_expense_month?, expected_amount?). Live as of `0008_shallow_ricochet`.
 - `kind` enum: `income` | `expense` | `transfer`. `status` enum: `cleared` | `projected`.
 - Transfers set `to_account_id` (the destination `account`); non-transfers leave it NULL and self-transfers are rejected. `amount` must be > 0.
-- Not yet in schema (planned): `external_account`, and category links (`income_category_id`, `expense_category_id`).
+- **Fixed-expense origin** (0008): `fixed_expense_id` (FK → `fixed_expense`, ON DELETE SET NULL)
+  + `fixed_expense_month` (day 1 of the SCHEDULED month, written by the recurrence engine).
+  Partial unique `(fixed_expense_id, fixed_expense_month)` = materialization idempotency key.
+  Only expenses may carry the link (`chk_fixed_expense_link`).
+- **Income projections** (0008, plan type "Proyección"): `expected_amount` is written once at
+  `createProjection` (= initial amount) and never mutated; `reconcileWithAmount` updates
+  `amount`/`status` so expected-vs-real stays derivable. Only income, > 0
+  (`chk_expected_amount_income`). `expected_amount IS NOT NULL` identifies the projection subset.
+- Not yet in schema (planned): `external_account`.
 
 ## Public interface
 
 - Capture / edit / reconcile (`projected` -> `cleared`) transactions.
-- Derived reads: per-account balance, **available real** (cleared cash+debit+investment), **available projected** (+ projected income).
+- Income projections: `createProjection` / `reconcileWithAmount(userId, id, realPesos)`
+  (`ledger-write.ts`); `listProjections` (`ledger-repo.ts`). Due projections (occurred_at <= today,
+  still projected) surface on the dashboard as "Por conciliar".
+- Derived reads: per-account balance, **available real** (cleared cash+debit+investment), **available projected** (+ projected income), **net projected** (ADR-010: projected + signed cleared credit balance — the dashboard's "Proyectado" card).
 - Credit: an expense creates debt; payment is a `transfer` of real money into the credit account. Statement/due derived from `occurred_at` vs the card's cutoff/payment days.
 - Invariant: `transfer` entries are **excluded** from category & budget totals.
 
