@@ -63,7 +63,7 @@ export function EmailSection({ email, verified }: EmailSectionProps) {
             <button
               type="submit"
               disabled={verifyPending}
-              className="w-full rounded border py-2.5 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+              className="w-full rounded border py-2.5 text-sm font-medium text-primary-700 hover:bg-primary-50 disabled:opacity-50 dark:text-primary-400 dark:hover:bg-primary-900"
             >
               {verifyPending ? "Enviando…" : "Enviar enlace de verificación"}
             </button>
@@ -104,14 +104,14 @@ export function EmailSection({ email, verified }: EmailSectionProps) {
             <button
               type="submit"
               disabled={changePending}
-              className="flex-1 rounded bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              className="flex-1 rounded bg-primary-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
             >
               {changePending ? "Enviando…" : "Enviar confirmación"}
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded border px-4 py-2.5 text-sm text-gray-600"
+              className="rounded border px-4 py-2.5 text-sm text-secondary-600 dark:text-secondary-300"
             >
               Cancelar
             </button>
@@ -121,7 +121,7 @@ export function EmailSection({ email, verified }: EmailSectionProps) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="w-full rounded border py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="w-full rounded border py-2.5 text-sm font-medium text-secondary-700 hover:bg-secondary-100 dark:text-secondary-200 dark:hover:bg-secondary-800"
         >
           {email ? "Cambiar correo" : "Añadir correo"}
         </button>

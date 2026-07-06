@@ -87,14 +87,14 @@ export function RegisterForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+        className="w-full rounded bg-primary-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
       >
         {pending ? "Creando cuenta…" : "Crear cuenta"}
       </button>
 
       <p className="text-center text-sm text-gray-500">
         ¿Ya tienes cuenta?{" "}
-        <Link href="/login" className="text-blue-600 hover:underline">
+        <Link href="/login" className="text-primary-700 hover:underline dark:text-primary-400">
           Inicia sesión
         </Link>
       </p>

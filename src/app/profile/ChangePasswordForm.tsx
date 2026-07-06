@@ -56,14 +56,14 @@ export function ChangePasswordForm() {
             <button
               type="submit"
               disabled={pending}
-              className="flex-1 rounded bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              className="flex-1 rounded bg-primary-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
             >
               {pending ? "Guardando…" : "Guardar"}
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded border px-4 py-2.5 text-sm text-gray-600"
+              className="rounded border px-4 py-2.5 text-sm text-secondary-600 dark:text-secondary-300"
             >
               Cancelar
             </button>
@@ -73,7 +73,7 @@ export function ChangePasswordForm() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="w-full rounded border py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="w-full rounded border py-2.5 text-sm font-medium text-secondary-700 hover:bg-secondary-100 dark:text-secondary-200 dark:hover:bg-secondary-800"
         >
           Cambiar contraseña
         </button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useActionState } from "react";
+import { Icon } from "@iconify/react";
 import {
   createAccountAction,
   updateAccountAction,
@@ -9,6 +10,7 @@ import {
   type AccountView,
 } from "@/app/actions/accounts";
 import type { Account } from "@/data/schema";
+import { ACCOUNT_KIND_META, accountKindTextClass } from "@/lib/branding/account-kind";
 
 type Kind = Account["kind"];
 
@@ -19,8 +21,8 @@ const KIND_LABELS: Record<Kind, string> = {
   investment: "Inversión",
 };
 
-// Kinds that normally carry bank/number/expiration metadata (purely a UI hint —
-// the schema doesn't restrict them by kind).
+// cash is a physical account, never a bank product (ADR-009,
+// chk_cash_no_bank_fields) — it never shows bank/number/expiration fields.
 const CARD_KINDS: Kind[] = ["debit", "credit"];
 const BANK_KINDS: Kind[] = ["debit", "credit", "investment"];
 
@@ -239,7 +241,7 @@ function NewAccountForm() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="rounded bg-primary-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
         >
           {pending ? "…" : "Crear cuenta"}
         </button>
@@ -299,14 +301,14 @@ function EditAccountForm({ account, onClose }: { account: Account; onClose: () =
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="rounded bg-primary-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
         >
           {pending ? "…" : "Guardar"}
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="rounded border px-4 py-1.5 text-sm text-gray-600"
+          className="rounded border px-4 py-1.5 text-sm text-secondary-600 dark:text-secondary-300"
         >
           Cancelar
         </button>
@@ -336,20 +338,31 @@ function AccountCard({ view }: { view: AccountView }) {
     .filter(Boolean)
     .join(" · ");
 
+  const kindMeta = ACCOUNT_KIND_META[account.kind];
+
   return (
     <div className={`rounded-lg border px-4 py-3 ${account.isActive ? "" : "opacity-50"}`}>
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-medium text-sm truncate">
-            {account.name}
-            <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
-              {KIND_LABELS[account.kind]}
-            </span>
-            {!account.isActive && (
-              <span className="ml-1 text-xs text-gray-400">(inactiva)</span>
-            )}
-          </p>
-          {meta && <p className="text-xs text-gray-400 truncate">{meta}</p>}
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span
+            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${kindMeta.bgSoft}`}
+          >
+            <Icon icon={kindMeta.icon} className={`h-5 w-5 ${accountKindTextClass(account.kind)}`} />
+          </span>
+          <div className="min-w-0">
+            <p className="font-medium text-sm truncate">
+              {account.name}
+              <span
+                className={`ml-2 rounded px-1.5 py-0.5 text-xs ${kindMeta.bgSoft} ${accountKindTextClass(account.kind)}`}
+              >
+                {KIND_LABELS[account.kind]}
+              </span>
+              {!account.isActive && (
+                <span className="ml-1 text-xs text-gray-400">(inactiva)</span>
+              )}
+            </p>
+            {meta && <p className="text-xs text-gray-400 truncate">{meta}</p>}
+          </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <p
@@ -360,7 +373,7 @@ function AccountCard({ view }: { view: AccountView }) {
           </p>
           <button
             onClick={() => setEditing((v) => !v)}
-            className="text-xs text-blue-600 hover:underline"
+            className="text-xs text-primary-700 hover:underline dark:text-primary-400"
           >
             Editar
           </button>
