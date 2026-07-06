@@ -66,6 +66,12 @@ function toRow(input: LedgerEntryInput): Omit<NewLedgerEntry, "userId"> {
     toAccountId: input.kind === "transfer" ? input.toAccountId : null,
     incomeCategoryId,
     expenseCategoryId,
+    // Campos de origen fijo / proyección: el input nunca los trae, pero un
+    // cambio de kind en updateEntry debe nullificar el que ya no aplica
+    // (chk_fixed_expense_link / chk_expected_amount_income) — mismo patrón
+    // que las categorías. Si el kind se conserva, se dejan intactos.
+    ...(input.kind !== "expense" && { fixedExpenseId: null, fixedExpenseMonth: null }),
+    ...(input.kind !== "income" && { expectedAmount: null }),
   };
 }
 
@@ -112,6 +118,79 @@ export async function updateEntry(
     .where(and(eq(ledgerEntry.id, id), eq(ledgerEntry.userId, userId)))
     .returning();
   if (!row) throw new Error(`ledger_entry ${id} not found`);
+  return row;
+}
+
+// ─── income projections (plan type "Proyección") ─────────────────────────────
+
+export const projectionCreateSchema = z.object({
+  amountPesos: z.number().positive({ message: "El monto debe ser mayor a 0" }),
+  concept: z.string().max(200).optional(),
+  occurredAt: z.coerce.date(),
+  accountId: z.number().int().positive(),
+  categoryId: z.number().int().positive().optional(),
+});
+
+export type ProjectionCreateInput = z.infer<typeof projectionCreateSchema>;
+
+// Un ingreso proyectado que conserva su monto esperado: expected_amount se
+// escribe una sola vez aquí (= amount inicial) y nunca vuelve a mutarse, para
+// poder mostrar esperado vs real tras conciliar.
+export async function createProjection(
+  userId: string,
+  input: ProjectionCreateInput
+): Promise<LedgerEntryRow> {
+  const parsed = projectionCreateSchema.parse(input);
+  await assertOwnedAccount(userId, parsed.accountId);
+
+  const amount = Math.round(parsed.amountPesos * 100);
+  const [row] = await db
+    .insert(ledgerEntry)
+    .values({
+      userId,
+      kind: "income",
+      status: "projected",
+      amount,
+      expectedAmount: amount,
+      concept: parsed.concept ?? null,
+      occurredAt: parsed.occurredAt,
+      accountId: parsed.accountId,
+      incomeCategoryId: parsed.categoryId ?? null,
+      expenseCategoryId: null,
+    })
+    .returning();
+  return row;
+}
+
+// Concilia una proyección de ingreso con el monto que realmente llegó:
+// actualiza amount y status; expected_amount queda intacto (es la memoria
+// del esperado, la diferencia se deriva en la lectura).
+export async function reconcileWithAmount(
+  userId: string,
+  id: number,
+  realPesos: number
+): Promise<LedgerEntryRow> {
+  if (!(realPesos > 0)) throw new Error("El monto real debe ser mayor a 0");
+
+  const [existing] = await db
+    .select({ kind: ledgerEntry.kind, status: ledgerEntry.status })
+    .from(ledgerEntry)
+    .where(and(eq(ledgerEntry.id, id), eq(ledgerEntry.userId, userId)))
+    .limit(1);
+  if (!existing) throw new Error(`ledger_entry ${id} not found`);
+  if (existing.kind !== "income" || existing.status !== "projected") {
+    throw new Error(`ledger_entry ${id} is not a pending income projection`);
+  }
+
+  const [row] = await db
+    .update(ledgerEntry)
+    .set({
+      amount: Math.round(realPesos * 100),
+      status: "cleared",
+      updatedAt: new Date(),
+    })
+    .where(and(eq(ledgerEntry.id, id), eq(ledgerEntry.userId, userId)))
+    .returning();
   return row;
 }
 
