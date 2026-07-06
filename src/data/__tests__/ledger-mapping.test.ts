@@ -17,6 +17,9 @@ function row(overrides: Partial<LedgerEntryRow> = {}): LedgerEntryRow {
     toAccountId: null,
     incomeCategoryId: null,
     expenseCategoryId: null,
+    fixedExpenseId: null,
+    fixedExpenseMonth: null,
+    expectedAmount: null,
     ...overrides,
   };
 }
