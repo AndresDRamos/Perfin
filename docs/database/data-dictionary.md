@@ -66,6 +66,9 @@ Constraints:
 - `chk_credit_limit_pos` — `credit_limit` NULL or `> 0`.
 - `chk_number_masked` — `number` IS NULL OR `number !~ '^[0-9]{13,19}$'` (rejects bare full card
   numbers/PANs).
+- `chk_cash_no_bank_fields` — `kind <> 'cash'` OR (`bank` IS NULL AND `number` IS NULL AND
+  `expiration_date` IS NULL). `cash` is a physical account, never a bank product (ADR-009);
+  `debit`/`investment` may still carry these fields freely.
 
 Indexes:
 

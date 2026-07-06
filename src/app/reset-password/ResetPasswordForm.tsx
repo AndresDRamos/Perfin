@@ -53,13 +53,13 @@ export function ResetPasswordForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+        className="w-full rounded bg-primary-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
       >
         {pending ? "Guardando…" : "Guardar contraseña"}
       </button>
 
       <p className="text-center text-sm text-gray-500">
-        <Link href="/forgot-password" className="text-blue-600 hover:underline">
+        <Link href="/forgot-password" className="text-primary-700 hover:underline dark:text-primary-400">
           Solicitar un enlace nuevo
         </Link>
       </p>

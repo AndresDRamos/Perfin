@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireSessionUser } from "@/data/auth-repo";
 import { logOutAction } from "@/app/actions/auth";
+import { Logo } from "@/app/components/Logo";
 import { EmailSection } from "./EmailSection";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 
@@ -20,8 +21,11 @@ export default async function ProfilePage({
   return (
     <main className="mx-auto max-w-sm p-8 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Perfil</h1>
-        <Link href="/" className="text-sm text-blue-600 hover:underline">
+        <div className="flex items-center gap-2">
+          <Logo size={22} withWordmark={false} />
+          <h1 className="text-2xl font-semibold">Perfil</h1>
+        </div>
+        <Link href="/" className="text-sm text-primary-700 hover:underline dark:text-primary-400">
           ← Inicio
         </Link>
       </div>

@@ -171,3 +171,6 @@ erDiagram
 - `profile.login_email` mirrors `auth.users.email` — the value actually passed to
   `signInWithPassword`. It is synthetic (`<username>@users.perfin.internal`,
   `has_real_email = false`) when the user registered without a real email.
+- `account.bank`/`number`/`expiration_date` must be NULL when `kind = 'cash'` (enforced by
+  `chk_cash_no_bank_fields`, migration `0007`) — `cash` is a physical account, never a bank
+  product (ADR-009); `debit`/`investment` may still carry these fields freely.
