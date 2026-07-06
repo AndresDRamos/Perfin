@@ -64,6 +64,13 @@
       "when": 1783360387672,
       "tag": "0008_shallow_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783364941485,
+      "tag": "0009_fix_credit_opening_sign",
+      "breakpoints": true
     }
   ]
 }
