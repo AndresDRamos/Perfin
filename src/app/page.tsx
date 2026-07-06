@@ -6,19 +6,17 @@ import { logOutAction } from "@/app/actions/auth";
 import { requireSessionUser } from "@/data/auth-repo";
 import { listAccountsWithBalances } from "@/data/account-repo";
 import { CaptureForm } from "@/app/components/CaptureForm";
-import { format, toPesos } from "@/domain/money";
-import { money } from "@/domain/money";
+import { ReconcileList } from "@/app/components/ReconcileList";
+import { format, money, toPesos } from "@/domain/money";
 import {
   listActiveIncomeCategories,
   listActiveExpenseCategories,
 } from "@/data/category-repo";
-import { ACCOUNT_KIND_META, accountKindTextClass, type AccountKind } from "@/lib/branding/account-kind";
+import { ACCOUNT_KIND_META, accountKindTextClass } from "@/lib/branding/account-kind";
 
 function formatMXN(pesos: number) {
   return format(money(Math.round(pesos * 100)));
 }
-
-const LIQUID_KINDS: AccountKind[] = ["cash", "debit", "investment"];
 
 export default async function Home() {
   const sessionUser = await requireSessionUser();
@@ -36,16 +34,13 @@ export default async function Home() {
     redirect("/onboarding");
   }
 
-  // "Patrimonio por tipo": real (cleared-only) balance grouped by kind, same
-  // liquid composition as the "Real" available figure above (cash+debit+
-  // investment) — credit is a liability, shown separately in its own section.
-  const netWorthByKind = LIQUID_KINDS.map((kind) => ({
-    kind,
-    totalPesos: accountViews
-      .filter((v) => v.account.isActive && v.account.kind === kind)
-      .reduce((sum, v) => sum + toPesos(v.balance), 0),
-  })).filter((row) => row.totalPesos !== 0);
-  const netWorthTotal = netWorthByKind.reduce((sum, row) => sum + row.totalPesos, 0);
+  // "Patrimonio": saldo real (cleared) por cuenta líquida activa — misma
+  // composición que el "Real" de arriba; el crédito es pasivo y vive en su
+  // propia sección. El desglose viene de getDashboard (netWorthAccounts).
+  const netWorthTotal = dashboard.netWorthAccounts.reduce(
+    (sum, row) => sum + row.balancePesos,
+    0
+  );
 
   // dashboard.creditCards.owedPesos is scoped to the *current open statement*
   // (ADR-004, pay-in-full: periods before the current cutoff are deliberately
@@ -98,39 +93,59 @@ export default async function Home() {
           </div>
           <div className="rounded-lg border p-4">
             <p className="text-xs text-secondary-600 dark:text-secondary-300 uppercase tracking-wide">Proyectado</p>
-            <p className="mt-1 text-2xl font-bold">{formatMXN(dashboard.projectedAvailablePesos)}</p>
-            <p className="text-xs text-gray-400">Incluye ingresos proyectados</p>
+            <p className="mt-1 text-2xl font-bold">{formatMXN(dashboard.netProjectedPesos)}</p>
+            <p className="text-xs text-gray-400">Patrimonio + ingresos esperados − deuda</p>
           </div>
         </div>
 
-        {netWorthByKind.length > 0 && (
+        <ReconcileList
+          projections={dashboard.dueProjections.map((p) => ({
+            id: p.id,
+            concept: p.concept,
+            occurredAtISO: p.occurredAt.toISOString(),
+            expectedPesos: p.expectedPesos,
+            accountName: p.accountName,
+          }))}
+        />
+
+        {dashboard.netWorthAccounts.length > 0 && (
           <div className="space-y-2">
-            <h3 className="font-medium text-sm text-secondary-600 dark:text-secondary-300">
-              Patrimonio por tipo
-            </h3>
-            <div className="space-y-1.5 rounded-lg border p-3">
-              {netWorthByKind.map(({ kind, totalPesos }) => {
-                const meta = ACCOUNT_KIND_META[kind];
-                const share = netWorthTotal !== 0 ? Math.max(totalPesos, 0) / netWorthTotal : 0;
-                return (
-                  <div key={kind} className="flex items-center gap-2.5">
-                    <Icon icon={meta.icon} className={`h-4 w-4 shrink-0 ${accountKindTextClass(kind)}`} />
-                    <span className="w-16 shrink-0 text-xs text-secondary-600 dark:text-secondary-300">
-                      {meta.label}
-                    </span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary-100 dark:bg-secondary-800">
-                      <div
-                        className={`h-full rounded-full ${meta.barClass}`}
-                        style={{ width: `${Math.round(share * 100)}%` }}
-                      />
-                    </div>
-                    <span className="w-20 shrink-0 text-right text-xs font-medium">
-                      {formatMXN(totalPesos)}
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="flex items-baseline justify-between">
+              <h3 className="font-medium text-sm text-secondary-600 dark:text-secondary-300">
+                Patrimonio
+              </h3>
+              <p className="text-sm font-semibold">{formatMXN(netWorthTotal)}</p>
             </div>
+            {dashboard.netWorthAccounts.map((row) => {
+              const meta = ACCOUNT_KIND_META[row.kind];
+              return (
+                <div
+                  key={row.id}
+                  className="flex items-center justify-between rounded-lg border px-4 py-3"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${meta.bgSoft}`}
+                    >
+                      <Icon
+                        icon={meta.icon}
+                        className={`h-4 w-4 ${accountKindTextClass(row.kind)}`}
+                      />
+                    </span>
+                    <div>
+                      <p className="font-medium text-sm">{row.name}</p>
+                      <p className="text-xs text-gray-400">
+                        {meta.label}
+                        {row.bank ? ` · ${row.bank}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="font-semibold text-primary-700 dark:text-primary-300">
+                    {formatMXN(row.balancePesos)}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         )}
 

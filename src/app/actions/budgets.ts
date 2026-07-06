@@ -16,7 +16,20 @@ import {
   reservationAccountExists,
 } from "@/data/budget-write";
 import { listPlans, planProgress, type PlanProgress } from "@/data/budget-repo";
-import { listActiveExpenseCategories } from "@/data/category-repo";
+import {
+  listActiveExpenseCategories,
+  listActiveFixedCategories,
+  listAllExpenseCategories,
+} from "@/data/category-repo";
+import { listProjections } from "@/data/ledger-repo";
+import {
+  listFixedExpenses,
+  materializeDueFixedExpenses,
+  todayISO,
+} from "@/data/fixed-expense-repo";
+import { listActiveAccounts } from "@/data/account-repo";
+import { nextOccurrenceAfter } from "@/domain/recurrence";
+import { money, toPesos } from "@/domain/money";
 import { requireSessionUser } from "@/data/auth-repo";
 import { db } from "@/data/db";
 import { account, plan, type PlanRow, type Account, type ExpenseCategoryRow } from "@/data/schema";
@@ -117,10 +130,91 @@ async function checkDuplicate(
 
 // ─── reads ────────────────────────────────────────────────────────────────────
 
-export async function getPlansPage(): Promise<{ plans: PlanRow[] }> {
+// Vista de una proyección de ingreso en /plans: pendiente o conciliada, con
+// esperado vs real (la diferencia se deriva aquí, nunca se almacena).
+export interface ProjectionView {
+  id: number;
+  concept: string | null;
+  occurredAt: Date;
+  status: "projected" | "cleared";
+  expectedPesos: number;
+  realPesos: number; // = expected mientras esté pendiente
+  accountName: string;
+}
+
+export interface FixedExpenseView {
+  id: number;
+  name: string;
+  amountPesos: number;
+  dayOfMonth: number;
+  isActive: boolean;
+  startDate: string;
+  endDate: string | null;
+  accountName: string;
+  categoryName: string;
+  // Próxima ocurrencia programada (null si la vigencia terminó o está inactivo).
+  nextDate: string | null;
+}
+
+export interface PlansPageData {
+  plans: PlanRow[];
+  projections: ProjectionView[];
+  fixedExpenses: FixedExpenseView[];
+  // Catálogos para los formularios de alta.
+  accounts: { id: number; name: string; kind: Account["kind"] }[];
+  fixedCategories: { id: number; name: string }[];
+}
+
+export async function getPlansPage(): Promise<PlansPageData> {
   const { userId } = await requireSessionUser();
-  const plans = await listPlans(userId);
-  return { plans };
+  const today = todayISO();
+  // Mismo motor lazy que el dashboard: /plans también dispara el catch-up.
+  await materializeDueFixedExpenses(userId, today);
+
+  const [plans, projections, fixedRows, accounts, fixedCategories, allCategories] =
+    await Promise.all([
+      listPlans(userId),
+      listProjections(userId),
+      listFixedExpenses(userId),
+      listActiveAccounts(userId),
+      listActiveFixedCategories(),
+      listAllExpenseCategories(),
+    ]);
+
+  const accountName = (id: number) => accounts.find((a) => a.id === id)?.name ?? "—";
+  const categoryName = new Map(allCategories.map((c) => [c.id, c.name]));
+
+  return {
+    plans,
+    projections: projections.map((p) => ({
+      id: p.id,
+      concept: p.concept,
+      occurredAt: p.occurredAt,
+      status: p.status,
+      expectedPesos: toPesos(money(p.expectedAmount ?? p.amount)),
+      realPesos: toPesos(money(p.amount)),
+      accountName: accountName(p.accountId),
+    })),
+    fixedExpenses: fixedRows.map((f) => ({
+      id: f.id,
+      name: f.name,
+      amountPesos: toPesos(money(f.amount)),
+      dayOfMonth: f.dayOfMonth,
+      isActive: f.isActive,
+      startDate: f.startDate,
+      endDate: f.endDate,
+      accountName: accountName(f.accountId),
+      categoryName: categoryName.get(f.expenseCategoryId) ?? "—",
+      nextDate: f.isActive
+        ? (nextOccurrenceAfter(
+            { dayOfMonth: f.dayOfMonth, startDate: f.startDate, endDate: f.endDate },
+            today
+          )?.date ?? null)
+        : null,
+    })),
+    accounts: accounts.map((a) => ({ id: a.id, name: a.name, kind: a.kind })),
+    fixedCategories: fixedCategories.map((c) => ({ id: c.id, name: c.name })),
+  };
 }
 
 export interface PlanDetail {
