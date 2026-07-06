@@ -1,0 +1,1 @@
+ALTER TABLE "account" ADD CONSTRAINT "chk_cash_no_bank_fields" CHECK ("account"."kind" <> 'cash' OR ("account"."bank" IS NULL AND "account"."number" IS NULL AND "account"."expiration_date" IS NULL));

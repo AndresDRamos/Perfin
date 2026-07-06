@@ -75,6 +75,21 @@ describe("Zod — accountCreateSchema (no crédito)", () => {
     });
     expect(r.success).toBe(false);
   });
+
+  it("no expone bank/number/expirationMonth en cash (chk_cash_no_bank_fields, ADR-009)", () => {
+    const r = accountCreateSchema.safeParse({
+      ...cashBase,
+      bank: "BBVA",
+      number: "****1234",
+      expirationMonth: "2028-09",
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect("bank" in r.data).toBe(false);
+      expect("number" in r.data).toBe(false);
+      expect("expirationMonth" in r.data).toBe(false);
+    }
+  });
 });
 
 describe("Zod — accountCreateSchema (crédito)", () => {

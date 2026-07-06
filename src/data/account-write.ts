@@ -36,6 +36,13 @@ const accountBase = z.object({
   // Pesos (UI input); converted to centavos before write. May be negative
   // (e.g. a credit card created with existing debt).
   openingBalancePesos: z.number().finite().default(0),
+});
+
+// bank/number/expirationMonth: only kinds that can plausibly be issued by an
+// institution carry them. cash is a physical account, never a bank product
+// (ADR-009, chk_cash_no_bank_fields is the DB backstop) — its branch below
+// omits these fields entirely rather than leaving them merely optional.
+const bankMetadata = z.object({
   bank: z.string().min(1).max(100).optional(),
   number: maskedNumber.optional(),
   expirationMonth: expirationMonth.optional(),
@@ -48,9 +55,9 @@ const accountBase = z.object({
 export const accountCreateSchema = z
   .discriminatedUnion("kind", [
     accountBase.extend({ kind: z.literal("cash") }),
-    accountBase.extend({ kind: z.literal("debit") }),
-    accountBase.extend({ kind: z.literal("investment") }),
-    accountBase.extend({
+    accountBase.extend(bankMetadata.shape).extend({ kind: z.literal("debit") }),
+    accountBase.extend(bankMetadata.shape).extend({ kind: z.literal("investment") }),
+    accountBase.extend(bankMetadata.shape).extend({
       kind: z.literal("credit"),
       cutoffDay: dayOfMonth,
       paymentDay: dayOfMonth,
@@ -101,9 +108,11 @@ function toCreateRow(input: AccountCreateInput): Omit<NewAccount, "userId"> {
     name: input.name,
     kind: input.kind,
     openingBalance: Math.round(input.openingBalancePesos * 100), // pesos → centavos
-    bank: input.bank ?? null,
-    number: input.number ?? null,
-    expirationDate: expirationToDate(input.expirationMonth),
+    // cash never carries bank metadata (chk_cash_no_bank_fields, ADR-009) —
+    // its branch of the discriminated union has no bank/number/expirationMonth.
+    bank: input.kind !== "cash" ? (input.bank ?? null) : null,
+    number: input.kind !== "cash" ? (input.number ?? null) : null,
+    expirationDate: input.kind !== "cash" ? expirationToDate(input.expirationMonth) : null,
     cutoffDay: input.kind === "credit" ? input.cutoffDay : null,
     paymentDay: input.kind === "credit" ? input.paymentDay : null,
     creditLimit:
@@ -144,6 +153,14 @@ export async function updateAccount(
     parsed.creditLimitPesos !== undefined;
   if (current.kind !== "credit" && touchesCreditFields) {
     throw new Error(`account ${id} is not a credit account; credit fields are not allowed`);
+  }
+
+  // cash never carries bank metadata (chk_cash_no_bank_fields, ADR-009) — reject
+  // early with a clear message instead of letting the DB CHECK surface first.
+  const touchesBankFields =
+    parsed.bank !== undefined || parsed.number !== undefined || parsed.expirationMonth !== undefined;
+  if (current.kind === "cash" && touchesBankFields) {
+    throw new Error(`account ${id} is a cash account; bank fields are not allowed`);
   }
 
   // Validate cutoff ≠ payment on the MERGED values (either side may be updated alone).

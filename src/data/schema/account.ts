@@ -62,6 +62,12 @@ export const account = pgTable(
     check("chk_cutoff_day_range", sql`${t.cutoffDay} BETWEEN 1 AND 28`),
     check("chk_payment_day_range", sql`${t.paymentDay} BETWEEN 1 AND 28`),
     check("chk_cutoff_ne_payment", sql`${t.cutoffDay} <> ${t.paymentDay}`),
+    // cash is a physical account, never a bank product (ADR-009) — bank/number/
+    // expiration_date stay NULL for it. debit/investment legitimately keep bank.
+    check(
+      "chk_cash_no_bank_fields",
+      sql`${t.kind} <> 'cash' OR (${t.bank} IS NULL AND ${t.number} IS NULL AND ${t.expirationDate} IS NULL)`
+    ),
     check("chk_credit_limit_pos", sql`${t.creditLimit} IS NULL OR ${t.creditLimit} > 0`),
     // Reject a full PAN (13-19 straight digits) — only masked identifiers allowed
     check("chk_number_masked", sql`${t.number} IS NULL OR ${t.number} !~ '^[0-9]{13,19}$'`),
