@@ -2,6 +2,21 @@
 
 > Append-only. Each entry: date, what changed, and why. `docs-sync` appends; history is never rewritten.
 
+## 2026-07-06 — `0007_easy_forgotten_one` (account: cash has no bank fields) — applied: true
+
+- Added CHECK `chk_cash_no_bank_fields` on `account` — `kind <> 'cash' OR (bank IS NULL AND
+  number IS NULL AND expiration_date IS NULL)`: a `cash` account can never carry `bank`, `number`,
+  or `expiration_date`. `debit`/`investment` are unaffected and may still set these fields freely.
+- **Reversible** — dropping the CHECK restores the prior (unrestricted) state; no data was
+  rewritten or destroyed.
+- No changes to columns, indexes, RLS policies, or `mcp_readonly` grants.
+- `account` had 0 rows in dev at apply time (verified by the `dba` sub-agent), so there was no
+  backfill risk and no existing row could have violated the new CHECK.
+- Why: plan `branding` / ADR-009 — efectivo es una cuenta física, nunca un producto bancario;
+  nada en DB impedía antes crear una cuenta `cash` con banco, número o vigencia, aunque la UI
+  nunca mostraba esos campos para ese tipo. El modelo de datos ahora es fiel a esa regla de
+  dominio en lugar de depender solo de la capa de escritura (Zod).
+
 ## 2026-07-04 — `0006_fluffy_rhodey` (profile: app-owned email verification state) — applied: true
 
 - Added column `profile.email_verified_at` (timestamptz, **nullable**, no default) — app-owned
