@@ -27,8 +27,24 @@ erDiagram
         varchar name "NOT NULL, max 100"
         varchar description "nullable, max 300"
         boolean is_savings "NOT NULL, default false"
+        boolean is_fixed "NOT NULL, default false, excl with is_savings"
         boolean is_active "NOT NULL, default true"
         timestamptz created_at "NOT NULL, default now()"
+    }
+
+    fixed_expense {
+        integer id PK "GENERATED ALWAYS AS IDENTITY"
+        uuid user_id FK "NOT NULL, owner, ON DELETE CASCADE"
+        varchar name "NOT NULL, max 100"
+        integer amount "NOT NULL, > 0, cents"
+        integer account_id FK "NOT NULL, ON DELETE RESTRICT"
+        integer expense_category_id FK "NOT NULL, ON DELETE RESTRICT"
+        integer day_of_month "NOT NULL, 1..31"
+        date start_date "NOT NULL"
+        date end_date "nullable, >= start_date when set"
+        boolean is_active "NOT NULL, default true"
+        timestamptz created_at "NOT NULL, default now()"
+        timestamptz updated_at "NOT NULL, default now()"
     }
 
     income_category {
@@ -53,6 +69,9 @@ erDiagram
         integer to_account_id FK "nullable, transfer only"
         integer income_category_id FK "nullable, income entries only"
         integer expense_category_id FK "nullable, expense entries only"
+        integer fixed_expense_id FK "nullable, expense only, ON DELETE SET NULL"
+        date fixed_expense_month "nullable, day 1, paired with fixed_expense_id"
+        integer expected_amount "nullable, income only, > 0"
     }
 
     plan {
@@ -113,6 +132,9 @@ erDiagram
     account ||--o{ ledger_entry : "to_account_id (transfer dest)"
     income_category ||--o{ ledger_entry : "income_category_id"
     expense_category ||--o{ ledger_entry : "expense_category_id"
+    fixed_expense ||--o{ ledger_entry : "fixed_expense_id (set null)"
+    account ||--o{ fixed_expense : "account_id (restrict)"
+    expense_category ||--o{ fixed_expense : "expense_category_id (restrict)"
     plan ||--o{ budget : "plan_id (cascade)"
     expense_category ||--o{ budget : "expense_category_id (category_cap)"
     account ||--o{ budget : "account_id (savings_reservation)"
@@ -120,6 +142,7 @@ erDiagram
     profile ||--o{ account : "auth.users.id -> account.user_id (external)"
     profile ||--o{ plan : "auth.users.id -> plan.user_id (external)"
     profile ||--o{ ledger_entry : "auth.users.id -> ledger_entry.user_id (external)"
+    profile ||--o{ fixed_expense : "auth.users.id -> fixed_expense.user_id (external)"
     space ||--o{ space_member : "space_id (cascade)"
     space ||--o{ space_account : "space_id (cascade)"
     account ||--o{ space_account : "account_id (cascade)"
@@ -136,6 +159,9 @@ erDiagram
 - All foreign keys use `ON DELETE no action ON UPDATE no action`, except: `budget.plan_id` →
   `plan` (`cascade`); `account.user_id` → `auth.users` (`restrict`); `plan.user_id` →
   `auth.users` (`cascade`); `ledger_entry.user_id` → `auth.users` (`restrict`);
+  `ledger_entry.fixed_expense_id` → `fixed_expense` (`set null`); `fixed_expense.user_id` →
+  `auth.users` (`cascade`); `fixed_expense.account_id` → `account` (`restrict`);
+  `fixed_expense.expense_category_id` → `expense_category` (`restrict`);
   `profile.user_id` → `auth.users` (`cascade`); `space.created_by` → `auth.users` (`set null`);
   `space_member.*` → `space`/`auth.users` (`cascade`); `space_account.space_id`/`account_id` →
   `space`/`account` (`cascade`).
@@ -151,7 +177,7 @@ erDiagram
   `ledger-write` (not by a DB trigger — the schema stays declarative). Cross-user transfers
   (`to_account_id` owned by a different user) are rejected in `ledger-write`, not by a DB
   constraint.
-- RLS is enabled on all 10 `public` tables but **no per-user policies exist yet** — isolation is
+- RLS is enabled on all 11 `public` tables but **no per-user policies exist yet** — isolation is
   enforced entirely in the server-action/repo layer (`WHERE user_id = session.userId`). Every
   table has exactly one policy, `<table>_select_mcp_readonly FOR SELECT USING (true)`, scoped to
   the `mcp_readonly` role used by the `db` MCP.
@@ -168,6 +194,16 @@ erDiagram
   `chk_category_kind`). Transfer entries leave both NULL.
 - `expense_category` has at most one row with `is_savings = true` (partial unique index
   `expense_category_savings_singleton`). Categories are global catalogs (no `user_id`).
+  `is_fixed = true` marks fixed-expense categories (seeded: "Servicios", "Subscripciones");
+  `is_savings` and `is_fixed` are mutually exclusive (`chk_expense_category_savings_fixed_excl`).
+- `fixed_expense` is a per-user monthly recurring-expense template (integer cents). A ledger
+  expense may link to it via `fixed_expense_id` + `fixed_expense_month` (day 1 of the covered
+  month, `chk_fixed_expense_month_day1`); the link requires `kind = 'expense'` and a month
+  (`chk_fixed_expense_link`), and at most one entry per template per month exists (partial unique
+  index `uq_ledger_entry_fixed_expense_month`). Deleting a template detaches its entries
+  (`ON DELETE SET NULL`); its `account_id`/`expense_category_id` FKs are `RESTRICT`.
+- `ledger_entry.expected_amount` (income entries only, `> 0` when set,
+  `chk_expected_amount_income`) stores the projected amount for projected-vs-actual comparison.
 - `profile.login_email` mirrors `auth.users.email` — the value actually passed to
   `signInWithPassword`. It is synthetic (`<username>@users.perfin.internal`,
   `has_real_email = false`) when the user registered without a real email.

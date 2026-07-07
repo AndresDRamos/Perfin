@@ -67,7 +67,7 @@ function BudgetCard({
       <div className="flex items-center justify-between">
         <div className="text-sm">
           <span className="font-medium">{label}</span>
-          <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+          <span className="ml-2 rounded bg-secondary-100 px-1.5 py-0.5 text-xs text-secondary-600 dark:bg-secondary-800 dark:text-secondary-300">
             {SUBTYPE_LABELS[b.subtype]}
           </span>
           {b.subtype === "purchase_goal" && b.horizon && (
@@ -89,13 +89,13 @@ function BudgetCard({
 
       {hasActual ? (
         <>
-          <div className="h-2 w-full overflow-hidden rounded bg-gray-100">
+          <div className="h-2 w-full overflow-hidden rounded bg-secondary-100 dark:bg-secondary-800">
             <div
-              className={`h-full ${over ? "bg-red-500" : "bg-blue-500"}`}
+              className={`h-full ${over ? "bg-red-500" : "bg-primary-500"}`}
               style={{ width: `${pct}%` }}
             />
           </div>
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between text-xs text-secondary-600 dark:text-secondary-300">
             <span>
               {pesos(item.realActual)}
               {item.projectedActual !== item.realActual && (
@@ -106,7 +106,9 @@ function BudgetCard({
           </div>
         </>
       ) : (
-        <div className="text-xs text-gray-500">Meta: {pesos(target)}</div>
+        <div className="text-xs text-secondary-600 dark:text-secondary-300">
+          Meta: {pesos(target)}
+        </div>
       )}
 
       {b.periodStart && b.periodEnd && (
@@ -240,7 +242,7 @@ function NewBudgetForm({ planId, expenseCategories, accounts }: Props) {
         )}
       </div>
 
-      <details className="text-xs text-gray-500">
+      <details className="text-xs text-secondary-600 dark:text-secondary-300">
         <summary className="cursor-pointer">Periodo propio (opcional)</summary>
         <div className="mt-2 flex gap-2">
           <input name="periodStart" type="date" className="flex-1 rounded border px-3 py-1.5" />
@@ -254,7 +256,7 @@ function NewBudgetForm({ planId, expenseCategories, accounts }: Props) {
       <button
         type="submit"
         disabled={pending}
-        className="rounded bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+        className="h-11 rounded bg-primary-600 px-4 text-sm font-medium text-white disabled:opacity-50"
       >
         {pending ? "…" : "Agregar presupuesto"}
       </button>

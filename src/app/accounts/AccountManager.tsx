@@ -170,10 +170,13 @@ function NewAccountForm() {
 
   const [state, action, pending] = useActionState(
     async (_prev: FormState, fd: FormData): Promise<FormState> => {
+      const entered = Number(fd.get("openingBalancePesos") || 0);
       const raw: Record<string, unknown> = {
         kind,
         name: fd.get("name"),
-        openingBalancePesos: Number(fd.get("openingBalancePesos") || 0),
+        // Crédito: el input captura la DEUDA en positivo; el ledger guarda
+        // saldo firmado (deuda = negativo) — mismo contrato que el onboarding.
+        openingBalancePesos: kind === "credit" ? -entered : entered,
         bank: fd.get("bank") || undefined,
         number: fd.get("number") || undefined,
         expirationMonth: fd.get("expirationMonth") || undefined,
@@ -225,7 +228,9 @@ function NewAccountForm() {
       </div>
       <div>
         <label className="block text-xs text-gray-500 mb-0.5">
-          Saldo inicial (MXN) — fijo después de crear
+          {kind === "credit"
+            ? "Deuda actual (MXN, si aplica) — fija después de crear"
+            : "Saldo inicial (MXN) — fijo después de crear"}
         </label>
         <input
           name="openingBalancePesos"

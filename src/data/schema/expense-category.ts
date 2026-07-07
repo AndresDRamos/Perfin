@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   index,
   integer,
   pgPolicy,
@@ -18,6 +19,9 @@ export const expenseCategory = pgTable(
     name: varchar("name", { length: 100 }).notNull(),
     description: varchar("description", { length: 300 }),
     isSavings: boolean("is_savings").notNull().default(false),
+    // Categorías para gastos fijos (plantillas fixed_expense). No singleton:
+    // puede haber varias; seeds "Servicios"/"Subscripciones" (editables).
+    isFixed: boolean("is_fixed").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -27,6 +31,11 @@ export const expenseCategory = pgTable(
     uniqueIndex("expense_category_savings_singleton")
       .on(t.isSavings)
       .where(sql`${t.isSavings} = TRUE`),
+    // Invariante estructural: la categoría de ahorro nunca es de fijos.
+    check(
+      "chk_expense_category_savings_fixed_excl",
+      sql`NOT (${t.isSavings} AND ${t.isFixed})`
+    ),
     index("idx_expense_category_is_active").on(t.isActive).where(sql`${t.isActive} = TRUE`),
     pgPolicy("expense_category_select_mcp_readonly", {
       for: "select",

@@ -133,8 +133,10 @@ RLS: enabled; policy `budget_select_mcp_readonly` FOR SELECT USING (true) TO `mc
 ## Table: `expense_category`
 
 Expense classification catalog. One reserved row has `is_savings = true` (the "Ahorro" category);
-enforced as a singleton by a partial unique index. Global (no `user_id`): categories are
-classification metadata, not per-user financial data.
+enforced as a singleton by a partial unique index. Rows with `is_fixed = true` mark categories
+usable by `fixed_expense` templates (seeded: "Servicios", "Subscripciones" in
+`0008_shallow_ricochet`); `is_savings` and `is_fixed` are mutually exclusive. Global (no
+`user_id`): categories are classification metadata, not per-user financial data.
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -142,12 +144,15 @@ classification metadata, not per-user financial data.
 | `description` | varchar(300) | YES | | | |
 | `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
 | `is_active` | boolean | NO | | `true` | Partial index on `is_active = true`. |
+| `is_fixed` | boolean | NO | | `false` | Marks fixed-expense categories; mutually exclusive with `is_savings`. |
 | `is_savings` | boolean | NO | | `false` | At most one row may have `true` (singleton partial index). |
 | `name` | varchar(100) | NO | | | Case-insensitive unique via `lower(name)` index. |
 
 Constraints:
 
 - `expense_category_pkey` — PRIMARY KEY (`id`).
+- `chk_expense_category_savings_fixed_excl` — `NOT (is_savings AND is_fixed)` (a category cannot be
+  both the savings singleton and a fixed-expense category).
 
 Indexes:
 
@@ -157,6 +162,49 @@ Indexes:
 - `idx_expense_category_is_active` — btree (`is_active`) WHERE `is_active = true`.
 
 RLS: enabled; policy `expense_category_select_mcp_readonly` FOR SELECT USING (true) TO
+`mcp_readonly`.
+
+## Table: `fixed_expense`
+
+Per-user template for a recurring monthly fixed expense (e.g. rent, subscriptions). Templates
+generate/link `ledger_entry` rows via `ledger_entry.fixed_expense_id` — at most one entry per
+template per month (partial unique index on the ledger side). Amounts are integer cents, like the
+rest of the schema.
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `account_id` | integer | NO | FK | | FK → `account.id`, ON DELETE RESTRICT; default paying account. |
+| `amount` | integer | NO | | | Expected monthly amount in cents; must be `> 0`. |
+| `created_at` | timestamptz | NO | | `now()` | |
+| `day_of_month` | integer | NO | | | Expected charge day; range 1-31. |
+| `end_date` | date | YES | | | NULL = open-ended; when set, `>= start_date`. |
+| `expense_category_id` | integer | NO | FK | | FK → `expense_category.id`, ON DELETE RESTRICT; expected to be an `is_fixed` category (app-level convention, not a DB constraint). |
+| `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `is_active` | boolean | NO | | `true` | Partial index on `user_id` WHERE `is_active = true`. |
+| `name` | varchar(100) | NO | | | |
+| `start_date` | date | NO | | | |
+| `updated_at` | timestamptz | NO | | `now()` | |
+| `user_id` | uuid | NO | FK | | FK → `auth.users.id`, ON DELETE CASCADE; owner of the template. |
+
+Constraints:
+
+- `fixed_expense_pkey` — PRIMARY KEY (`id`).
+- `fixed_expense_user_id_users_id_fk` — FK (`user_id`) → `auth.users(id)`, ON DELETE CASCADE,
+  ON UPDATE no action.
+- `fixed_expense_account_id_account_id_fk` — FK (`account_id`) → `account(id)`, ON DELETE
+  RESTRICT, ON UPDATE no action.
+- `fixed_expense_expense_category_id_expense_category_id_fk` — FK (`expense_category_id`) →
+  `expense_category(id)`, ON DELETE RESTRICT, ON UPDATE no action.
+- `chk_fixed_expense_amount_positive` — `amount > 0`.
+- `chk_fixed_expense_day_range` — `day_of_month` BETWEEN 1 AND 31.
+- `chk_fixed_expense_period_order` — `end_date` IS NULL OR `end_date >= start_date`.
+
+Indexes:
+
+- `fixed_expense_pkey` — UNIQUE btree (`id`).
+- `idx_fixed_expense_user_active` — btree (`user_id`) WHERE `is_active = true`.
+
+RLS: enabled; policy `fixed_expense_select_mcp_readonly` FOR SELECT USING (true) TO
 `mcp_readonly`.
 
 ## Table: `income_category`
@@ -189,7 +237,10 @@ RLS: enabled; policy `income_category_select_mcp_readonly` FOR SELECT USING (tru
 Transaction ledger; single source of truth for balances. Records income, expense, and transfer
 entries, each projected or cleared. Category FKs are mutually exclusive by kind (enforced by
 `chk_category_kind`). `user_id` is denormalized from `account.user_id` (copied by `ledger-write` on
-insert) to avoid joins on the hot path and to prepare for future per-user RLS policies.
+insert) to avoid joins on the hot path and to prepare for future per-user RLS policies. Expense
+entries may link to a `fixed_expense` template (`fixed_expense_id` + `fixed_expense_month`, at most
+one entry per template per month); income entries may carry an `expected_amount` for projected-vs-
+actual comparison.
 
 | Column | Type | Nullable | Key | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -197,7 +248,10 @@ insert) to avoid joins on the hot path and to prepare for future per-user RLS po
 | `amount` | integer | NO | | | Must be `> 0`. |
 | `concept` | varchar(200) | YES | | | |
 | `created_at` | timestamptz | NO | | `now()` | |
+| `expected_amount` | integer | YES | | | Income entries only; `> 0` when set (`chk_expected_amount_income`). |
 | `expense_category_id` | integer | YES | FK | | FK → `expense_category.id`; set only for expense entries. |
+| `fixed_expense_id` | integer | YES | FK | | FK → `fixed_expense.id`, ON DELETE SET NULL; expense entries only, requires `fixed_expense_month`. |
+| `fixed_expense_month` | date | YES | | | Month the fixed-expense link covers; must be day 1 (`chk_fixed_expense_month_day1`). |
 | `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
 | `income_category_id` | integer | YES | FK | | FK → `income_category.id`; set only for income entries. |
 | `kind` | ledger_entry_kind | NO | | | Enum: income, expense, transfer. |
@@ -214,6 +268,8 @@ Constraints:
   ON UPDATE no action.
 - `ledger_entry_expense_category_id_expense_category_id_fk` — FK (`expense_category_id`) →
   `expense_category(id)`, ON DELETE no action, ON UPDATE no action.
+- `ledger_entry_fixed_expense_id_fixed_expense_id_fk` — FK (`fixed_expense_id`) →
+  `fixed_expense(id)`, ON DELETE SET NULL, ON UPDATE no action.
 - `ledger_entry_income_category_id_income_category_id_fk` — FK (`income_category_id`) →
   `income_category(id)`, ON DELETE no action, ON UPDATE no action.
 - `ledger_entry_to_account_id_account_id_fk` — FK (`to_account_id`) → `account(id)`, ON DELETE no
@@ -226,6 +282,11 @@ Constraints:
 - `chk_transfer_to_account` — `transfer` entries require `to_account_id`; non-transfer entries must
   leave it NULL.
 - `chk_no_self_transfer` — `to_account_id` NULL or `<> account_id`.
+- `chk_fixed_expense_link` — `fixed_expense_id` NULL, or the entry is `kind = 'expense'` AND
+  `fixed_expense_month` IS NOT NULL.
+- `chk_fixed_expense_month_day1` — `fixed_expense_month` NULL or its day-of-month is 1.
+- `chk_expected_amount_income` — `expected_amount` NULL, or the entry is `kind = 'income'` AND
+  `expected_amount > 0`.
 
 Indexes:
 
@@ -239,6 +300,9 @@ Indexes:
   `income_category_id IS NOT NULL`.
 - `idx_ledger_entry_occurred_at` — btree (`occurred_at`).
 - `idx_ledger_entry_to_account` — btree (`to_account_id`) WHERE `to_account_id IS NOT NULL`.
+- `uq_ledger_entry_fixed_expense_month` — UNIQUE btree (`fixed_expense_id`,
+  `fixed_expense_month`) WHERE `fixed_expense_id IS NOT NULL`. At most one ledger entry per
+  fixed-expense template per month.
 
 RLS: enabled; policy `ledger_entry_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_readonly`.
 

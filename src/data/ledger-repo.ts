@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "./db";
 import { account, ledgerEntry, LedgerEntryRow } from "./schema";
 import { toSignedLegs, toCreditLegs } from "./ledger-mapping";
@@ -64,6 +64,23 @@ export async function balanceOf(userId: string, accountId: number): Promise<Mone
   );
 
   return deriveBalance(money(acc.openingBalance), entries);
+}
+
+// Proyecciones de ingreso (plan tipo "Proyección"): toda entry income que
+// nació proyectada — expected_amount solo se escribe en createProjection y
+// nunca muta, así que identifica al subconjunto aun después de conciliar.
+export async function listProjections(userId: string): Promise<LedgerEntryRow[]> {
+  return db
+    .select()
+    .from(ledgerEntry)
+    .where(
+      and(
+        eq(ledgerEntry.userId, userId),
+        eq(ledgerEntry.kind, "income"),
+        isNotNull(ledgerEntry.expectedAmount)
+      )
+    )
+    .orderBy(desc(ledgerEntry.occurredAt));
 }
 
 // Signed credit entries for a single credit account (for currentStatementOwed / nextDueDate).

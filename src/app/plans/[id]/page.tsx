@@ -18,7 +18,7 @@ export default async function PlanDetailPage({
   const { progress, expenseCategories, accounts } = detail;
 
   return (
-    <main className="mx-auto max-w-2xl p-8 space-y-8">
+    <main className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8 sm:space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{progress.plan.name}</h1>
@@ -26,7 +26,10 @@ export default async function PlanDetailPage({
             {progress.plan.periodStart} → {progress.plan.periodEnd}
           </p>
         </div>
-        <Link href="/plans" className="text-sm text-blue-600 hover:underline">
+        <Link
+          href="/plans"
+          className="text-sm text-primary-700 hover:underline dark:text-primary-400"
+        >
           ← Planes
         </Link>
       </div>
