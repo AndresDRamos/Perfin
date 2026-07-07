@@ -15,6 +15,7 @@ documented here as a first-class entity.
 | --- | --- |
 | `account_kind` | cash, debit, investment, credit |
 | `budget_subtype` | category_cap, savings_reservation, purchase_goal |
+| `income_frequency` | weekly, biweekly, semimonthly, monthly |
 | `ledger_entry_kind` | income, expense, transfer |
 | `ledger_entry_status` | cleared, projected |
 | `purchase_horizon` | short, medium, long |
@@ -142,6 +143,7 @@ classification metadata, not per-user financial data.
 | `description` | varchar(300) | YES | | | |
 | `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
 | `is_active` | boolean | NO | | `true` | Partial index on `is_active = true`. |
+| `is_fixed` | boolean | NO | | `false` | Marks categories used for fixed (recurring) expenses. Present in the live dev DB; not tracked by any migration on this branch (drift from another session). |
 | `is_savings` | boolean | NO | | `false` | At most one row may have `true` (singleton partial index). |
 | `name` | varchar(100) | NO | | | Case-insensitive unique via `lower(name)` index. |
 
@@ -158,6 +160,48 @@ Indexes:
 
 RLS: enabled; policy `expense_category_select_mcp_readonly` FOR SELECT USING (true) TO
 `mcp_readonly`.
+
+## Table: `fixed_expense`
+
+Per-user template for a recurring monthly fixed expense (rent, subscriptions, etc.). Occurrences
+are materialized as `ledger_entry` expense rows that point back via `fixed_expense_id` +
+`fixed_expense_month` (at most one entry per fixed expense per month). **Drift note**: this table
+exists in the live dev DB but is not tracked by any migration in `drizzle/` nor by
+`src/data/schema/` on the current branch (`feat/dashboard-restructure`); it was applied to the dev
+DB from another session/branch.
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `account_id` | integer | NO | FK | | FK → `account.id`, ON DELETE RESTRICT; account the expense is paid from. |
+| `amount` | integer | NO | | | Centavos; must be `> 0`. |
+| `created_at` | timestamptz | NO | | `now()` | |
+| `day_of_month` | integer | NO | | | Range 1-31. |
+| `end_date` | date | YES | | | NULL = open-ended; otherwise `>= start_date`. |
+| `expense_category_id` | integer | NO | FK | | FK → `expense_category.id`, ON DELETE RESTRICT. |
+| `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `is_active` | boolean | NO | | `true` | Partial index on `is_active = true`. |
+| `name` | varchar(100) | NO | | | |
+| `start_date` | date | NO | | | |
+| `updated_at` | timestamptz | NO | | `now()` | |
+| `user_id` | uuid | NO | FK | | FK → `auth.users.id`, ON DELETE CASCADE. |
+
+Constraints:
+
+- `fixed_expense_pkey` — PRIMARY KEY (`id`).
+- `fixed_expense_user_id_users_id_fk` — FK (`user_id`) → `auth.users(id)`, ON DELETE CASCADE.
+- `fixed_expense_account_id_account_id_fk` — FK (`account_id`) → `account(id)`, ON DELETE RESTRICT.
+- `fixed_expense_expense_category_id_expense_category_id_fk` — FK (`expense_category_id`) →
+  `expense_category(id)`, ON DELETE RESTRICT.
+- `chk_fixed_expense_amount_positive` — `amount > 0`.
+- `chk_fixed_expense_day_range` — `day_of_month` BETWEEN 1 AND 31.
+- `chk_fixed_expense_period_order` — `end_date` IS NULL OR `end_date >= start_date`.
+
+Indexes:
+
+- `fixed_expense_pkey` — UNIQUE btree (`id`).
+- `idx_fixed_expense_user_active` — btree (`user_id`) WHERE `is_active = true`.
+
+RLS: enabled; policy `fixed_expense_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_readonly`.
 
 ## Table: `income_category`
 
@@ -184,6 +228,52 @@ Indexes:
 RLS: enabled; policy `income_category_select_mcp_readonly` FOR SELECT USING (true) TO
 `mcp_readonly`.
 
+## Table: `income_schedule`
+
+Recurring income configuration per user (e.g. payroll). `frequency` is the `income_frequency`
+enum (`weekly`, `biweekly`, `semimonthly`, `monthly`); `semimonthly` means day 15 **and** the last
+day of the month, anchored by `anchor_date`. Occurrences are computed in memory (recurrence
+engine) and **never materialized** — when a payday arrives the app asks for the real amount and
+writes it as a `ledger_entry` (`kind = income`, `status = cleared`); there is intentionally **no
+FK** between `ledger_entry` and `income_schedule`. `estimated_amount` is in centavos and only
+feeds projections. Added in `0008_steady_sister_grimm`.
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `account_id` | integer | NO | FK | | FK → `account.id`, ON DELETE RESTRICT; destination account of the income. |
+| `anchor_date` | date | NO | | | Reference payday that anchors the recurrence series. |
+| `created_at` | timestamptz | NO | | `now()` | |
+| `estimated_amount` | integer | NO | | | Centavos; must be `> 0`. Projection only — real amounts live in `ledger_entry`. |
+| `frequency` | income_frequency | NO | | | Enum: weekly, biweekly, semimonthly, monthly. |
+| `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `income_category_id` | integer | YES | FK | | FK → `income_category.id`; optional default category for the generated income entries. |
+| `is_active` | boolean | NO | | `true` | Partial index on `is_active = true`. |
+| `name` | varchar(100) | NO | | | |
+| `updated_at` | timestamptz | NO | | `now()` | |
+| `user_id` | uuid | NO | FK | | FK → `auth.users.id`, ON DELETE CASCADE. |
+
+Constraints:
+
+- `income_schedule_pkey` — PRIMARY KEY (`id`).
+- `income_schedule_user_id_users_id_fk` — FK (`user_id`) → `auth.users(id)`, ON DELETE CASCADE,
+  ON UPDATE no action.
+- `income_schedule_account_id_account_id_fk` — FK (`account_id`) → `account(id)`, ON DELETE
+  RESTRICT, ON UPDATE no action.
+- `income_schedule_income_category_id_income_category_id_fk` — FK (`income_category_id`) →
+  `income_category(id)`, ON DELETE no action, ON UPDATE no action.
+- `chk_income_schedule_amount_pos` — `estimated_amount > 0`.
+
+Indexes:
+
+- `income_schedule_pkey` — UNIQUE btree (`id`).
+- `idx_income_schedule_account_id` — btree (`account_id`).
+- `idx_income_schedule_user_active` — btree (`user_id`) WHERE `is_active = true`. The hot
+  dashboard-projection read.
+- `idx_income_schedule_user_id` — btree (`user_id`).
+
+RLS: enabled; policy `income_schedule_select_mcp_readonly` FOR SELECT USING (true) TO
+`mcp_readonly`.
+
 ## Table: `ledger_entry`
 
 Transaction ledger; single source of truth for balances. Records income, expense, and transfer
@@ -197,7 +287,10 @@ insert) to avoid joins on the hot path and to prepare for future per-user RLS po
 | `amount` | integer | NO | | | Must be `> 0`. |
 | `concept` | varchar(200) | YES | | | |
 | `created_at` | timestamptz | NO | | `now()` | |
+| `expected_amount` | integer | YES | | | Only for income entries; `> 0` when set (e.g. the projected amount vs. the real `amount`). Live-DB drift: not in this branch's migrations. |
 | `expense_category_id` | integer | YES | FK | | FK → `expense_category.id`; set only for expense entries. |
+| `fixed_expense_id` | integer | YES | FK | | FK → `fixed_expense.id`, ON DELETE SET NULL; expense entries only, requires `fixed_expense_month`. Live-DB drift: not in this branch's migrations. |
+| `fixed_expense_month` | date | YES | | | Month covered by the fixed-expense occurrence, normalized to day 1. Unique per `fixed_expense_id`. Live-DB drift: not in this branch's migrations. |
 | `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
 | `income_category_id` | integer | YES | FK | | FK → `income_category.id`; set only for income entries. |
 | `kind` | ledger_entry_kind | NO | | | Enum: income, expense, transfer. |
@@ -214,6 +307,8 @@ Constraints:
   ON UPDATE no action.
 - `ledger_entry_expense_category_id_expense_category_id_fk` — FK (`expense_category_id`) →
   `expense_category(id)`, ON DELETE no action, ON UPDATE no action.
+- `ledger_entry_fixed_expense_id_fixed_expense_id_fk` — FK (`fixed_expense_id`) →
+  `fixed_expense(id)`, ON DELETE SET NULL.
 - `ledger_entry_income_category_id_income_category_id_fk` — FK (`income_category_id`) →
   `income_category(id)`, ON DELETE no action, ON UPDATE no action.
 - `ledger_entry_to_account_id_account_id_fk` — FK (`to_account_id`) → `account(id)`, ON DELETE no
@@ -226,6 +321,11 @@ Constraints:
 - `chk_transfer_to_account` — `transfer` entries require `to_account_id`; non-transfer entries must
   leave it NULL.
 - `chk_no_self_transfer` — `to_account_id` NULL or `<> account_id`.
+- `chk_expected_amount_income` — `expected_amount` NULL, or (`kind = 'income'` AND
+  `expected_amount > 0`).
+- `chk_fixed_expense_link` — `fixed_expense_id` NULL, or (`kind = 'expense'` AND
+  `fixed_expense_month` IS NOT NULL).
+- `chk_fixed_expense_month_day1` — `fixed_expense_month` NULL or day-of-month = 1.
 
 Indexes:
 
@@ -239,6 +339,8 @@ Indexes:
   `income_category_id IS NOT NULL`.
 - `idx_ledger_entry_occurred_at` — btree (`occurred_at`).
 - `idx_ledger_entry_to_account` — btree (`to_account_id`) WHERE `to_account_id IS NOT NULL`.
+- `uq_ledger_entry_fixed_expense_month` — UNIQUE btree (`fixed_expense_id`, `fixed_expense_month`)
+  WHERE `fixed_expense_id IS NOT NULL` (one materialized occurrence per fixed expense per month).
 
 RLS: enabled; policy `ledger_entry_select_mcp_readonly` FOR SELECT USING (true) TO `mcp_readonly`.
 
