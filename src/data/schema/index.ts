@@ -10,3 +10,4 @@ export * from "./expense-category";
 export * from "./ledger-entry";
 export * from "./plan";
 export * from "./budget";
+export * from "./income-schedule";
