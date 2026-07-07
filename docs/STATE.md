@@ -81,13 +81,39 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   "Cambiar contraseña" en perfil/cuentas/onboarding) pasaron de `text-gray-700`/`-600` (sin
   variante dark, contraste ~1.6:1 sobre el fondo oscuro) a `text-secondary-600 dark:text-
   secondary-300` -- gap real expuesto por el flip a `prefers-color-scheme` de este mismo plan.
-- **Next**: fixed expenses (`fixed_expense` table + recurrence engine). También pendientes:
+- **Dashboard restructure** (`dashboard-restructure`, complete) -- `/` re-estructurado como centro
+  de navegación: saldo actual (Σ balances derivados de todas las cuentas activas, crédito
+  incluido en negativo), línea de tiempo interactiva de saldo (`BalanceTimeline`, SVG propio,
+  hoy−10/+30 visibles con drag hasta hoy−40/+30, tooltip, tap→detalle del día editable),
+  saldos por cuenta agrupados efectivo→débito→inversión→crédito con captura contextual
+  (`EntryModal`: ingreso con pregunta de cuenta origen, ajuste de saldo en inversión,
+  pago/liquidar en crédito), y barras de presupuesto del plan vigente con detalle y captura por
+  categoría. Nueva tabla `income_schedule` (migración `0008`, aplicada) para ingresos recurrentes
+  (`weekly`/`biweekly`/`semimonthly` = día 15 y fin de mes/`monthly`); el monto es un ESTIMADO --
+  el día de pago la app pide el monto real (`confirmPaydayAction`, dedupe ±3 días re-verificado
+  server-side) y lo escribe como `ledger_entry` income cleared, sin FK entre ambos. Proyección
+  futura del saldo = projected + ocurrencias estimadas de ingreso + quema lineal del remanente de
+  cada `category_cap` vigente (dominio puro en `src/domain/{recurrence,timeline}.ts`, 25 tests).
+  `CaptureForm.tsx` y el bloque "Patrimonio por tipo" quedaron reemplazados.
+- **Next**: fixed expenses (`fixed_expense` table + recurrence engine) -- **atención**: la tabla y
+  columnas relacionadas ya existen en la BD de dev sin migración que las respalde en esta rama
+  (ver riesgo de drift abajo); reconciliar antes de continuar ese módulo. También pendientes:
   gestión de espacios (crear/invitar/exponer cuentas), marca de cuenta de nómina + proyección de
   próximo ingreso (ver visión en memoria del usuario), configurar "Secure email change" OFF +
   Redirect URLs en el dashboard de Supabase (bloquea la verificación E2E del ciclo de correo del
   plan `auth-profile-recovery`).
 
 ## Active risks
+
+- **Drift de esquema en dev (detectado 2026-07-06 por docs-sync)**: la BD viva contiene
+  `fixed_expense`, `expense_category.is_fixed` y `ledger_entry.{fixed_expense_id,
+  fixed_expense_month, expected_amount}` (+ constraints e índice único asociados) que **ninguna
+  migración de `drizzle/` (0000–0008) ni `src/data/schema/` rastrea** en la rama
+  `feat/dashboard-restructure`. Probable sesión paralela del módulo fixed-expenses aplicando
+  esquema fuera de esta rama (la BD de dev es compartida). Riesgo concreto: un
+  `drizzle-kit generate` desde un árbol sin esos objetos podría proponer DROPs. Reconciliar
+  (traer la migración/branch que los creó, o revertirlos) antes de mergear planes que generen
+  migraciones nuevas. `data-dictionary.md`/`erd.md` ya los documentan con nota de drift.
 
 - Derived-balance queries may slow as the ledger grows -- mitigate with indexes / materialized read
   models *only if needed* (always derived, never authoritative state).

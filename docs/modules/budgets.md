@@ -23,6 +23,15 @@ Optional planning layer. A **plan** holds budgets, always tied to the available 
 - Binds to **projected** available for planning, **real** (cleared) available for actuals.
 - Savings reservation helps set money aside from budgeted income into the designated savings account (modeled as a `transfer`).
 
+## Dashboard surface
+
+The dashboard (`/`, `BudgetBars`) shows the `category_cap` budgets of the plan whose period covers
+today, sorted by % of real spend (desc). Tapping a category expands its period transactions and
+offers capture with the category prefilled or scheduling a future `projected` expense; a light
+inline "new expense category" input reuses the catalog action (full CRUD stays in `/categories`).
+No current plan → CTA to `/plans`. The remaining cap also feeds the balance-timeline projection
+(linear burn — see `ledger.md`).
+
 ## Dependencies
 
 - `ledger` (actuals come from income/expense entries; reservations are transfers).
