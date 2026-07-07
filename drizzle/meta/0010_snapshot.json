@@ -1,6 +1,6 @@
 {
-  "id": "5adbb916-ea11-4d8d-8067-01d7fc616c3f",
-  "prevId": "0875a94e-be79-4a70-935f-aa253ef4fa61",
+  "id": "26060734-d5d1-4fc9-9997-14f2ba933edd",
+  "prevId": "df0dc889-e9fb-4ece-8b1a-b4d2f6a80cb5",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -872,6 +872,203 @@
         }
       },
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.income_schedule": {
+      "name": "income_schedule",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "income_schedule_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "frequency": {
+          "name": "frequency",
+          "type": "income_frequency",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estimated_amount": {
+          "name": "estimated_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "income_category_id": {
+          "name": "income_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "anchor_date": {
+          "name": "anchor_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_income_schedule_user_active": {
+          "name": "idx_income_schedule_user_active",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"income_schedule\".\"is_active\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_income_schedule_user_id": {
+          "name": "idx_income_schedule_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_income_schedule_account_id": {
+          "name": "idx_income_schedule_account_id",
+          "columns": [
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "income_schedule_user_id_users_id_fk": {
+          "name": "income_schedule_user_id_users_id_fk",
+          "tableFrom": "income_schedule",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "income_schedule_account_id_account_id_fk": {
+          "name": "income_schedule_account_id_account_id_fk",
+          "tableFrom": "income_schedule",
+          "tableTo": "account",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "income_schedule_income_category_id_income_category_id_fk": {
+          "name": "income_schedule_income_category_id_income_category_id_fk",
+          "tableFrom": "income_schedule",
+          "tableTo": "income_category",
+          "columnsFrom": [
+            "income_category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "income_schedule_select_mcp_readonly": {
+          "name": "income_schedule_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "chk_income_schedule_amount_pos": {
+          "name": "chk_income_schedule_amount_pos",
+          "value": "\"income_schedule\".\"estimated_amount\" > 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.profile": {
@@ -1802,6 +1999,16 @@
         "short",
         "medium",
         "long"
+      ]
+    },
+    "public.income_frequency": {
+      "name": "income_frequency",
+      "schema": "public",
+      "values": [
+        "weekly",
+        "biweekly",
+        "semimonthly",
+        "monthly"
       ]
     },
     "public.space_role": {

@@ -7,6 +7,7 @@ export * from "./space-account";
 export * from "./account";
 export * from "./income-category";
 export * from "./expense-category";
+export * from "./fixed-expense";
 export * from "./ledger-entry";
 export * from "./plan";
 export * from "./budget";

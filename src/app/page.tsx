@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getDashboard } from "@/app/actions/ledger";
 import { getDashboardV2 } from "@/app/actions/dashboard";
 import { logOutAction } from "@/app/actions/auth";
 import { requireSessionUser } from "@/data/auth-repo";
 import { Dashboard } from "@/app/components/dashboard/Dashboard";
+import { ReconcileList } from "@/app/components/ReconcileList";
 
 export default async function Home() {
   const sessionUser = await requireSessionUser();
+  // Sequential, not Promise.all: getDashboard() lazily materializes due fixed
+  // expenses (materializeDueFixedExpenses) before reading — getDashboardV2's
+  // ledger reads must run AFTER that write commits, or today's materialized
+  // entries could be missing from the balance timeline.
+  const legacyDashboard = await getDashboard();
   const data = await getDashboardV2();
 
   // First-run guide: a brand-new user has 0 active accounts — send them
@@ -42,6 +49,18 @@ export default async function Home() {
           </form>
         </nav>
       </div>
+
+      {/* Proyecciones de ingreso vencidas (plan tipo "Proyección") por conciliar
+          antes que nada — necesitan el monto real del usuario. */}
+      <ReconcileList
+        projections={legacyDashboard.dueProjections.map((p) => ({
+          id: p.id,
+          concept: p.concept,
+          occurredAtISO: p.occurredAt.toISOString(),
+          expectedPesos: p.expectedPesos,
+          accountName: p.accountName,
+        }))}
+      />
 
       <Dashboard data={data} />
     </main>

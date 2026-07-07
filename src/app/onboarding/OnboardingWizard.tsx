@@ -203,7 +203,12 @@ function BankAccountForm({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const name = String(fd.get("name") ?? "");
-    const openingBalancePesos = Number(fd.get("openingBalancePesos") || 0);
+    const entered = Number(fd.get("openingBalancePesos") || 0);
+    // Crédito: el input captura la DEUDA en positivo (así piensa el usuario),
+    // pero el ledger guarda saldo firmado — deuda = negativo (convención de
+    // balances derivados). Sin esta inversión el neto SUMA la deuda (bug real
+    // detectado con datos de producción; migración 0009 reparó los afectados).
+    const openingBalancePesos = kind === "credit" ? -entered : entered;
     const raw: Record<string, unknown> = {
       kind,
       name,
@@ -246,7 +251,7 @@ function BankAccountForm({
       </div>
       <div>
         <label className="mb-0.5 block text-xs text-gray-500">
-          Saldo {kind === "credit" ? "actual (deuda, si aplica)" : "inicial"} (MXN)
+          {kind === "credit" ? "Deuda actual (MXN, si aplica)" : "Saldo inicial (MXN)"}
         </label>
         <input
           name="openingBalancePesos"

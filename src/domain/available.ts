@@ -34,3 +34,15 @@ export function projectedAvailable(accounts: AccountForAvailable[]): Money {
       return add(acc, balance);
     }, ZERO);
 }
+
+// Net projected (ADR-010): projected available on liquid accounts PLUS the
+// signed cleared balance of credit accounts. A card in debt has a negative
+// derived balance (subtracts); a card with a favor balance adds. This is the
+// only figure where credit debt touches "available" — real/projected above
+// keep the ADR-001 separation.
+export function netProjected(accounts: AccountForAvailable[]): Money {
+  const creditBalance = accounts
+    .filter((a) => a.kind === "credit")
+    .reduce((acc, a) => add(acc, deriveBalance(a.openingBalance, a.entries)), ZERO);
+  return add(projectedAvailable(accounts), creditBalance);
+}

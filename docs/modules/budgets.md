@@ -19,6 +19,14 @@ Optional planning layer. A **plan** holds budgets, always tied to the available 
 
 ## Public interface
 
+- **/plans is the home of the three plan types** (plan `plan-types-dashboard-neto`): the page
+  lists three sections — *Presupuestos* (`plan` + `budget`), *Proyecciones de ingreso*
+  (`ledger_entry` income projections, owned by the ledger module) and *Gastos fijos*
+  (`fixed_expense` templates, owned by catalog) — and creation starts with a type selector
+  (3 cards, mobile-first). Only *Presupuesto* creates rows in this module's tables.
+- Presupuesto quality-of-life: name is optional (defaults to "Plan de {inicio} a {fin}" or
+  "Plan para el {fecha}") and a "fecha única" checkbox stores `period_start = period_end`.
+  Both are UI-level — `plan` gained no columns.
 - Create plans & budgets; track actuals against targets.
 - Binds to **projected** available for planning, **real** (cleared) available for actuals.
 - Savings reservation helps set money aside from budgeted income into the designated savings account (modeled as a `transfer`).

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "./db";
 import { incomeCategory, expenseCategory, IncomeCategoryRow, ExpenseCategoryRow } from "./schema";
 
@@ -15,6 +15,15 @@ export async function listActiveExpenseCategories(): Promise<ExpenseCategoryRow[
     .select()
     .from(expenseCategory)
     .where(eq(expenseCategory.isActive, true))
+    .orderBy(expenseCategory.name);
+}
+
+// Categorías elegibles para plantillas de gasto fijo (formulario de Fijo).
+export async function listActiveFixedCategories(): Promise<ExpenseCategoryRow[]> {
+  return db
+    .select()
+    .from(expenseCategory)
+    .where(and(eq(expenseCategory.isActive, true), eq(expenseCategory.isFixed, true)))
     .orderBy(expenseCategory.name);
 }
 

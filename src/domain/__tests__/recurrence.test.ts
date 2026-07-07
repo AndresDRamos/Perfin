@@ -1,104 +1,108 @@
-import { describe, expect, it } from "vitest";
-import { occurrencesBetween, RecurrenceSpec } from "../recurrence";
+import { describe, it, expect } from "vitest";
+import { occurrencesBetween, nextOccurrenceAfter, RecurrenceTemplate } from "../recurrence";
 
-function spec(frequency: RecurrenceSpec["frequency"], anchorDate: string): RecurrenceSpec {
-  return { frequency, anchorDate };
-}
+const tpl = (
+  dayOfMonth: number,
+  startDate: string,
+  endDate?: string | null
+): RecurrenceTemplate => ({ dayOfMonth, startDate, endDate });
 
-describe("occurrencesBetween — weekly / biweekly", () => {
-  it("keeps the anchor's 7-day parity", () => {
-    // anchor Friday 2026-07-03
-    expect(occurrencesBetween(spec("weekly", "2026-07-03"), "2026-07-06", "2026-07-31")).toEqual([
-      "2026-07-10",
-      "2026-07-17",
-      "2026-07-24",
-      "2026-07-31",
+describe("occurrencesBetween", () => {
+  it("una ocurrencia por mes en el día programado", () => {
+    const occ = occurrencesBetween(tpl(10, "2026-01-01"), "2026-01-01", "2026-03-31");
+    expect(occ).toEqual([
+      { month: "2026-01-01", date: "2026-01-10" },
+      { month: "2026-02-01", date: "2026-02-10" },
+      { month: "2026-03-01", date: "2026-03-10" },
     ]);
   });
 
-  it("includes the anchor itself when in range", () => {
-    expect(occurrencesBetween(spec("weekly", "2026-07-10"), "2026-07-06", "2026-07-17")).toEqual([
-      "2026-07-10",
-      "2026-07-17",
+  it("clamp de día 31 a fin de mes corto", () => {
+    const occ = occurrencesBetween(tpl(31, "2026-04-01"), "2026-04-01", "2026-06-30");
+    expect(occ).toEqual([
+      { month: "2026-04-01", date: "2026-04-30" },
+      { month: "2026-05-01", date: "2026-05-31" },
+      { month: "2026-06-01", date: "2026-06-30" },
     ]);
   });
 
-  it("biweekly steps 14 days and skips the off week", () => {
-    expect(
-      occurrencesBetween(spec("biweekly", "2026-06-26"), "2026-07-01", "2026-08-10")
-    ).toEqual(["2026-07-10", "2026-07-24", "2026-08-07"]);
+  it("clamp de día 30 en febrero no bisiesto", () => {
+    const occ = occurrencesBetween(tpl(30, "2026-02-01"), "2026-02-01", "2026-02-28");
+    expect(occ).toEqual([{ month: "2026-02-01", date: "2026-02-28" }]);
   });
 
-  it("projects nothing before the anchor (floor)", () => {
-    expect(occurrencesBetween(spec("weekly", "2026-08-01"), "2026-07-01", "2026-07-31")).toEqual(
-      []
-    );
+  it("clamp de día 29 en febrero bisiesto cae en el 29", () => {
+    const occ = occurrencesBetween(tpl(29, "2028-02-01"), "2028-02-01", "2028-02-29");
+    expect(occ).toEqual([{ month: "2028-02-01", date: "2028-02-29" }]);
+  });
+
+  it("respeta la vigencia: sin ocurrencias antes de startDate", () => {
+    // start el 15, día programado el 10 → enero no ocurre; arranca en febrero.
+    const occ = occurrencesBetween(tpl(10, "2026-01-15"), "2026-01-01", "2026-02-28");
+    expect(occ).toEqual([{ month: "2026-02-01", date: "2026-02-10" }]);
+  });
+
+  it("respeta la vigencia: endDate corta las ocurrencias posteriores", () => {
+    // end el 5 de marzo, día programado el 10 → marzo ya no ocurre.
+    const occ = occurrencesBetween(tpl(10, "2026-01-01", "2026-03-05"), "2026-01-01", "2026-12-31");
+    expect(occ).toEqual([
+      { month: "2026-01-01", date: "2026-01-10" },
+      { month: "2026-02-01", date: "2026-02-10" },
+    ]);
+  });
+
+  it("catch-up multi-mes tras meses sin abrir la app, cruzando año", () => {
+    const occ = occurrencesBetween(tpl(5, "2025-11-01"), "2025-11-01", "2026-02-15");
+    expect(occ).toEqual([
+      { month: "2025-11-01", date: "2025-11-05" },
+      { month: "2025-12-01", date: "2025-12-05" },
+      { month: "2026-01-01", date: "2026-01-05" },
+      { month: "2026-02-01", date: "2026-02-05" },
+    ]);
+  });
+
+  it("ventana vacía cuando from > to o vigencia fuera de rango", () => {
+    expect(occurrencesBetween(tpl(10, "2026-01-01"), "2026-03-01", "2026-02-01")).toEqual([]);
+    expect(occurrencesBetween(tpl(10, "2027-01-01"), "2026-01-01", "2026-12-31")).toEqual([]);
+  });
+
+  it("la ocurrencia del mes de `to` solo entra si ya venció", () => {
+    // hoy = 2026-03-07, día programado 10 → marzo aún no ocurre.
+    const occ = occurrencesBetween(tpl(10, "2026-02-01"), "2026-02-01", "2026-03-07");
+    expect(occ).toEqual([{ month: "2026-02-01", date: "2026-02-10" }]);
   });
 });
 
-describe("occurrencesBetween — semimonthly (quincenal: 15 y fin de mes)", () => {
-  it("yields the 15th and the LAST day of each month", () => {
-    expect(
-      occurrencesBetween(spec("semimonthly", "2026-01-01"), "2026-07-01", "2026-08-31")
-    ).toEqual(["2026-07-15", "2026-07-31", "2026-08-15", "2026-08-31"]);
+describe("nextOccurrenceAfter", () => {
+  it("la de este mes si aún no vence", () => {
+    expect(nextOccurrenceAfter(tpl(10, "2026-01-01"), "2026-03-07")).toEqual({
+      month: "2026-03-01",
+      date: "2026-03-10",
+    });
   });
 
-  it("February: last day is the 28th (not an undefined 30th)", () => {
-    expect(
-      occurrencesBetween(spec("semimonthly", "2026-01-01"), "2026-02-01", "2026-02-28")
-    ).toEqual(["2026-02-15", "2026-02-28"]);
+  it("la del mes siguiente si la de este mes ya pasó", () => {
+    expect(nextOccurrenceAfter(tpl(10, "2026-01-01"), "2026-03-10")).toEqual({
+      month: "2026-04-01",
+      date: "2026-04-10",
+    });
   });
 
-  it("leap-year February pays on the 29th", () => {
-    expect(
-      occurrencesBetween(spec("semimonthly", "2028-01-01"), "2028-02-16", "2028-03-01")
-    ).toEqual(["2028-02-29"]);
+  it("clamp: día 31 tras el 30 de abril cae el 31 de mayo", () => {
+    expect(nextOccurrenceAfter(tpl(31, "2026-01-01"), "2026-04-30")).toEqual({
+      month: "2026-05-01",
+      date: "2026-05-31",
+    });
   });
 
-  it("anchor mid-month floors the first quincena", () => {
-    expect(
-      occurrencesBetween(spec("semimonthly", "2026-07-20"), "2026-07-01", "2026-08-15")
-    ).toEqual(["2026-07-31", "2026-08-15"]);
-  });
-});
-
-describe("occurrencesBetween — monthly", () => {
-  it("repeats the anchor's day of month", () => {
-    expect(occurrencesBetween(spec("monthly", "2026-05-10"), "2026-07-01", "2026-09-30")).toEqual([
-      "2026-07-10",
-      "2026-08-10",
-      "2026-09-10",
-    ]);
+  it("antes de la vigencia devuelve la primera ocurrencia válida", () => {
+    expect(nextOccurrenceAfter(tpl(10, "2026-06-15"), "2026-01-01")).toEqual({
+      month: "2026-07-01",
+      date: "2026-07-10",
+    });
   });
 
-  it("clamps day 31 to short months (30) and February (28)", () => {
-    expect(occurrencesBetween(spec("monthly", "2026-01-31"), "2026-02-01", "2026-04-30")).toEqual([
-      "2026-02-28",
-      "2026-03-31",
-      "2026-04-30",
-    ]);
-  });
-
-  it("day 29 pays Feb 29 on leap years", () => {
-    expect(occurrencesBetween(spec("monthly", "2028-01-29"), "2028-02-01", "2028-02-29")).toEqual([
-      "2028-02-29",
-    ]);
-  });
-});
-
-describe("occurrencesBetween — edges", () => {
-  it("empty when the range is inverted", () => {
-    expect(occurrencesBetween(spec("weekly", "2026-07-03"), "2026-07-10", "2026-07-01")).toEqual(
-      []
-    );
-  });
-
-  it("single-day range hits only an exact payday", () => {
-    expect(occurrencesBetween(spec("weekly", "2026-07-03"), "2026-07-10", "2026-07-10")).toEqual([
-      "2026-07-10",
-    ]);
-    expect(occurrencesBetween(spec("weekly", "2026-07-03"), "2026-07-11", "2026-07-11")).toEqual(
-      []
-    );
+  it("null si la vigencia ya terminó", () => {
+    expect(nextOccurrenceAfter(tpl(10, "2026-01-01", "2026-03-31"), "2026-03-15")).toBeNull();
   });
 });

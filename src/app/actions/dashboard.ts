@@ -15,7 +15,7 @@ import { toSignedLegs } from "@/data/ledger-mapping";
 import { LedgerEntryRow } from "@/data/schema";
 import { money, toPesos, add, ZERO, Money } from "@/domain/money";
 import { addDays, ISODate } from "@/domain/dates";
-import { occurrencesBetween, IncomeFrequency } from "@/domain/recurrence";
+import { occurrencesBetween, IncomeFrequency } from "@/domain/income-recurrence";
 import {
   buildBalanceSeries,
   CategoryBurn,

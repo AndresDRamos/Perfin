@@ -2,7 +2,7 @@
 
 > Append-only. Each entry: date, what changed, and why. `docs-sync` appends; history is never rewritten.
 
-## 2026-07-06 — `0008_steady_sister_grimm` (income_schedule: recurring income config) — applied: true
+## 2026-07-07 — `0010_lovely_princess_powerful` (income_schedule: recurring income config) — applied: true
 
 - Created enum `income_frequency` (`weekly`, `biweekly`, `semimonthly`, `monthly`). `semimonthly`
   (quincenal) means **the 15th AND the last day of the month** — "15 y 30" is undefined in February
@@ -22,9 +22,70 @@
   `db` MCP (`mcp_readonly`) can SELECT the table (0 rows, no error).
 - **Reversible** — 100 % additive; rollback is `DROP TABLE income_schedule; DROP TYPE
   income_frequency;`. No existing table, enum, index, policy, or grant was touched.
+- **Renumbered from the original `0008_steady_sister_grimm`** drafted during planning: while this
+  plan was in flight, `0008`/`0009` were claimed on `main` by the concurrent
+  `plan-types-dashboard-neto` plan (`0008_shallow_ricochet`, `0009_fix_credit_opening_sign`) — the
+  dev DB is shared, so the schema was regenerated on top of that merged history instead of
+  reusing the stale tag.
 - Why: plan `dashboard-restructure` — the balance-timeline projection needs the user's expected
   recurring income(s); on payday the app asks the real amount and writes an income/cleared
   `ledger_entry` (no FK between schedule and entry).
+
+## 2026-07-06 — `0009_fix_credit_opening_sign` (data fix: credit debt sign) — applied: true
+
+- **Data-only migration, no DDL**: `UPDATE account SET opening_balance = -opening_balance WHERE
+  kind = 'credit' AND opening_balance > 0`. Credit cards created before this fix captured their
+  debt as a POSITIVE opening balance (the onboarding label read "Saldo actual (deuda, si aplica)"
+  and stored the typed value verbatim), inverting the ledger's signed-balance convention
+  (debt = negative). Visible effect with real data: the net projected (ADR-010) ADDED the debt
+  instead of subtracting it, and the dashboard's credit-card section showed negative red amounts.
+- Rows affected in dev (previous values recorded in the migration file for manual rollback):
+  `Citi-1` 175290 → −175290, `Citi-2` 460844 → −460844, `Nu` 196189 → −196189. `Tarjeta Test`
+  (already negative) untouched. Verified live post-apply via the `db` MCP.
+- The capture layer was fixed in the same session (`OnboardingWizard.tsx` / `AccountManager.tsx`:
+  for `kind = 'credit'` the input is labeled "Deuda actual" and the typed positive amount is
+  stored negated), so rows created after this fix can no longer hit the WHERE clause with debt.
+- **Reversible by hand** using the values recorded above; not idempotent in the abstract (a
+  legitimate future positive credit balance would be flipped if re-run), but migrations run
+  exactly once per environment and new environments start with an empty `account` table.
+- Why: plan `plan-types-dashboard-neto` (post-verification fix) — user report with production
+  data: "Proyectado está sumando la deuda en lugar de restarla".
+
+## 2026-07-06 — `0008_shallow_ricochet` (fixed expenses + income projections + fixed categories) — applied: true
+
+- Created table `fixed_expense` (monthly recurring-expense template): identity PK; `user_id uuid`
+  NOT NULL → FK `auth.users` ON DELETE CASCADE (planning metadata, coherent with `plan`); `name`
+  varchar(100); `amount` integer centavos with `chk_fixed_expense_amount_positive`; `account_id`
+  NOT NULL → FK `account` ON DELETE RESTRICT (charge account, any kind — credit charges become
+  card debt through the normal ledger flow); `expense_category_id` NOT NULL → FK
+  `expense_category` ON DELETE RESTRICT; `day_of_month` 1..31 (`chk_fixed_expense_day_range`,
+  engine clamps to month end); `start_date`/`end_date?` (`chk_fixed_expense_period_order`);
+  `is_active`; timestamps. Partial index `idx_fixed_expense_user_active` (`user_id` WHERE
+  `is_active`). RLS enabled + policy `fixed_expense_select_mcp_readonly` + hand-added
+  `GRANT SELECT TO "mcp_readonly"`.
+- Added to `ledger_entry`: `fixed_expense_id` (FK → `fixed_expense` ON DELETE **SET NULL** —
+  materialized entries are real transactions that outlive their template), `fixed_expense_month`
+  (date, day 1 of the SCHEDULED month, written by the engine — deliberately NOT derived from
+  `occurred_at`: `date_trunc('month', timestamptz)` is STABLE/non-indexable and editing the date
+  would move the idempotency key), `expected_amount` (integer centavos — expected amount of an
+  income projection; reconcile updates `amount`/`status` and never this column).
+- New CHECKs on `ledger_entry`: `chk_fixed_expense_link` (only expenses may come from a template,
+  and then carry their month; one-directional so a month may be orphaned after FK SET NULL),
+  `chk_fixed_expense_month_day1`, `chk_expected_amount_income` (only income, > 0).
+- Materialization idempotency: partial unique index `uq_ledger_entry_fixed_expense_month`
+  (`fixed_expense_id`, `fixed_expense_month`) WHERE `fixed_expense_id IS NOT NULL` — the engine
+  inserts with `ON CONFLICT DO NOTHING`.
+- Added `expense_category.is_fixed` boolean NOT NULL DEFAULT false + CHECK
+  `chk_expense_category_savings_fixed_excl` (`NOT (is_savings AND is_fixed)`). Hand-added
+  idempotent seeds `Servicios` / `Subscripciones` (`is_fixed = true`, editable, not reserved)
+  with explicit `ON CONFLICT (lower("name")) DO NOTHING` against the expression unique index.
+- **Reversible forward, destructive rollback** (dropping the table/columns loses templates,
+  expected amounts and template→entry links; ledger entries survive). Verified live post-apply:
+  seeds present (ids 7, 8), `fixed_expense` visible to `mcp_readonly` (grant effective), the 3
+  new `ledger_entry` columns and the partial unique index exist. Re-verified 2026-07-06 (build
+  session) via the `db` MCP: table, 3 columns, `is_fixed`, both seeds and the unique index present.
+- Why: plan `plan-types-dashboard-neto` — plan types Presupuesto/Proyección/Fijo; `fixed_expense`
+  was deferred in STATE since 0003; projections keep expected vs real comparison after reconcile.
 
 ## 2026-07-06 — `0007_easy_forgotten_one` (account: cash has no bank fields) — applied: true
 

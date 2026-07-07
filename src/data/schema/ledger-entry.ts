@@ -1,11 +1,13 @@
 import {
   check,
+  date,
   index,
   integer,
   pgEnum,
   pgPolicy,
   pgTable,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -15,6 +17,7 @@ import { mcpReadonly } from "./roles";
 import { account } from "./account";
 import { incomeCategory } from "./income-category";
 import { expenseCategory } from "./expense-category";
+import { fixedExpense } from "./fixed-expense";
 
 export const ledgerEntryKindEnum = pgEnum("ledger_entry_kind", [
   "income",
@@ -58,6 +61,20 @@ export const ledgerEntry = pgTable(
     // chk_category_kind enforces which column matches the entry's kind.
     incomeCategoryId: integer("income_category_id").references(() => incomeCategory.id),
     expenseCategoryId: integer("expense_category_id").references(() => expenseCategory.id),
+    // Origen de materialización de gastos fijos. SET NULL: las entries son
+    // transacciones reales que sobreviven a su plantilla.
+    fixedExpenseId: integer("fixed_expense_id").references(() => fixedExpense.id, {
+      onDelete: "set null",
+    }),
+    // Mes de la OCURRENCIA PROGRAMADA (día 1), escrito por el motor. NO se
+    // deriva de occurred_at: date_trunc('month', timestamptz) es STABLE (no
+    // indexable) y editar occurred_at movería la clave de idempotencia.
+    fixedExpenseMonth: date("fixed_expense_month"),
+    // Monto ESPERADO de una proyección de ingreso (centavos). Se escribe al
+    // crearla (= amount inicial); conciliar actualiza amount/status y nunca
+    // esta columna. "Solo si nació proyectada" se garantiza en ledger-write
+    // (el status muta al conciliar; no es expresable en CHECK).
+    expectedAmount: integer("expected_amount"),
   },
   (t) => [
     // Amount must always be a meaningful positive value
@@ -99,6 +116,28 @@ export const ledgerEntry = pgTable(
     index("idx_ledger_entry_expense_category")
       .on(t.expenseCategoryId)
       .where(sql`${t.expenseCategoryId} IS NOT NULL`),
+    // Solo gastos pueden venir de plantilla, y si vienen, traen su mes.
+    // (Un solo sentido: permite month huérfano tras el SET NULL del FK.)
+    check(
+      "chk_fixed_expense_link",
+      sql`${t.fixedExpenseId} IS NULL
+          OR (${t.kind} = 'expense' AND ${t.fixedExpenseMonth} IS NOT NULL)`
+    ),
+    // Normalizado a día 1 del mes (mismo patrón que account.expiration_date).
+    check(
+      "chk_fixed_expense_month_day1",
+      sql`${t.fixedExpenseMonth} IS NULL OR EXTRACT(DAY FROM ${t.fixedExpenseMonth}) = 1`
+    ),
+    // Solo ingresos llevan monto esperado, siempre positivo.
+    check(
+      "chk_expected_amount_income",
+      sql`${t.expectedAmount} IS NULL OR (${t.kind} = 'income' AND ${t.expectedAmount} > 0)`
+    ),
+    // IDEMPOTENCIA de materialización: máximo una entry por plantilla por mes
+    // de ocurrencia. El motor inserta con ON CONFLICT DO NOTHING contra este índice.
+    uniqueIndex("uq_ledger_entry_fixed_expense_month")
+      .on(t.fixedExpenseId, t.fixedExpenseMonth)
+      .where(sql`${t.fixedExpenseId} IS NOT NULL`),
     pgPolicy("ledger_entry_select_mcp_readonly", {
       for: "select",
       to: mcpReadonly,
