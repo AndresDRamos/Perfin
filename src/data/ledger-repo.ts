@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import { account, ledgerEntry, LedgerEntryRow } from "./schema";
 import { toSignedLegs, toCreditLegs } from "./ledger-mapping";
@@ -15,6 +15,33 @@ import { deriveBalance } from "@/domain/balances";
 
 async function fetchEntriesForUser(userId: string): Promise<LedgerEntryRow[]> {
   return db.select().from(ledgerEntry).where(eq(ledgerEntry.userId, userId));
+}
+
+// Every entry of the user, for in-memory derivations that need the full
+// picture at once (balance timeline: past deltas + future-dated legs + payday
+// dedupe). Same fetch the other reads already do — v1 volumes make this cheap.
+export async function listEntriesForUser(userId: string): Promise<LedgerEntryRow[]> {
+  return fetchEntriesForUser(userId);
+}
+
+// Entries whose business day falls in [from, to] (ISO dates, inclusive), for
+// range-scoped reads like the day detail or a category's period transactions.
+export async function entriesBetween(
+  userId: string,
+  from: string,
+  to: string
+): Promise<LedgerEntryRow[]> {
+  return db
+    .select()
+    .from(ledgerEntry)
+    .where(
+      and(
+        eq(ledgerEntry.userId, userId),
+        sql`${ledgerEntry.occurredAt} >= ${from}`,
+        sql`${ledgerEntry.occurredAt} < (${to}::date + interval '1 day')`
+      )
+    )
+    .orderBy(ledgerEntry.occurredAt);
 }
 
 // ─── public read API ─────────────────────────────────────────────────────────

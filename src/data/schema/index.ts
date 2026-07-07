@@ -11,3 +11,4 @@ export * from "./fixed-expense";
 export * from "./ledger-entry";
 export * from "./plan";
 export * from "./budget";
+export * from "./income-schedule";

@@ -42,17 +42,19 @@ ledger balance. Onboarding (`/onboarding`) and the dashboard consume the shared 
 - **Onboarding** (`/onboarding`, `src/app/onboarding/`): 3-step guided flow (cash -> bank accounts
   -> summary) for a brand-new user, calling the same `createAccountAction` as `/accounts`. `/`
   redirects here when the signed-in user has 0 active accounts.
-- **Dashboard** (`/`, `src/app/page.tsx`): "Patrimonio por tipo" groups the real (cleared-only)
-  balance by `kind` for the liquid kinds (`cash`/`debit`/`investment`) via
-  `listAccountsWithBalances`; credit cards render with the same icon/color as their chip.
+- **Dashboard** (`/`, `src/app/page.tsx` + `src/app/components/dashboard/`): re-structured by plan
+  `dashboard-restructure`. "Saldo actual" = Σ derived balances of ALL active accounts (credit
+  negative). "Saldos" section groups active accounts cash → debit → investment → credit with the
+  branding icon/color; tapping a card opens the contextual capture modal (`EntryModal`); add/edit
+  links to `/accounts`. The former "Patrimonio por tipo" block was replaced by this section.
 
 ## Branding
 
 `src/lib/branding/account-kind.ts` -- `ACCOUNT_KIND_META`, the single source of truth for the
 kind -> `{label, icon (Iconify mdi:*), textLight/textDark, bgSoft, barClass}` mapping consumed by
 `/accounts`, `/onboarding` and `/`. Colors are drawn from the brand token scale in
-`src/app/globals.css` (`@theme`, Tailwind v4 CSS-first) -- see
-`docs/plans/onboarding-dashboard-branding.md` for the derivation and WCAG contrast table. Fixed
+`src/app/globals.css` (`@theme`, Tailwind v4 CSS-first) -- the derivation and WCAG contrast table
+live in the pruned plan `onboarding-dashboard-branding` (git history of `docs/plans/`). Fixed
 mapping, no per-account override exists (confirmed with the `dba` review: purely a design
 decision, not data). `barClass` must stay a literal Tailwind class string (e.g. `"bg-primary-500"`)
 -- Tailwind's build-time scanner cannot see runtime-computed class names.

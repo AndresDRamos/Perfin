@@ -1,61 +1,26 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Icon } from "@iconify/react";
 import { getDashboard } from "@/app/actions/ledger";
+import { getDashboardV2 } from "@/app/actions/dashboard";
 import { logOutAction } from "@/app/actions/auth";
 import { requireSessionUser } from "@/data/auth-repo";
-import { listAccountsWithBalances } from "@/data/account-repo";
-import { CaptureForm } from "@/app/components/CaptureForm";
+import { Dashboard } from "@/app/components/dashboard/Dashboard";
 import { ReconcileList } from "@/app/components/ReconcileList";
-import { format, money, toPesos } from "@/domain/money";
-import {
-  listActiveIncomeCategories,
-  listActiveExpenseCategories,
-} from "@/data/category-repo";
-import { ACCOUNT_KIND_META, accountKindTextClass } from "@/lib/branding/account-kind";
-
-function formatMXN(pesos: number) {
-  return format(money(Math.round(pesos * 100)));
-}
 
 export default async function Home() {
   const sessionUser = await requireSessionUser();
-  const [dashboard, accountViews, incomeCategories, expenseCategories] = await Promise.all([
-    getDashboard(),
-    listAccountsWithBalances(sessionUser.userId),
-    listActiveIncomeCategories(),
-    listActiveExpenseCategories(),
-  ]);
-  const accounts = accountViews.filter((v) => v.account.isActive).map((v) => v.account);
+  // Sequential, not Promise.all: getDashboard() lazily materializes due fixed
+  // expenses (materializeDueFixedExpenses) before reading — getDashboardV2's
+  // ledger reads must run AFTER that write commits, or today's materialized
+  // entries could be missing from the balance timeline.
+  const legacyDashboard = await getDashboard();
+  const data = await getDashboardV2();
 
   // First-run guide: a brand-new user has 0 active accounts — send them
   // through the onboarding wizard instead of an empty dashboard.
-  if (accounts.length === 0) {
+  if (data.accounts.length === 0) {
     redirect("/onboarding");
   }
-
-  // "Patrimonio": saldo real (cleared) por cuenta líquida activa — misma
-  // composición que el "Real" de arriba; el crédito es pasivo y vive en su
-  // propia sección. El desglose viene de getDashboard (netWorthAccounts).
-  const netWorthTotal = dashboard.netWorthAccounts.reduce(
-    (sum, row) => sum + row.balancePesos,
-    0
-  );
-
-  // dashboard.creditCards.owedPesos is scoped to the *current open statement*
-  // (ADR-004, pay-in-full: periods before the current cutoff are deliberately
-  // excluded — see currentStatementOwed). That is not "how much I owe on this
-  // card" for a card whose debt was set via opening_balance or predates the
-  // current cutoff — the account's real total balance (same figure /accounts
-  // shows) is. Look it up from the balances we already fetched above instead
-  // of introducing a second, inconsistent number. Negated like
-  // currentStatementOwed does: the signed balance is negative when in debt,
-  // but "owed" is conventionally shown as a positive amount.
-  const creditBalanceByAccountId = new Map(
-    accountViews
-      .filter((v) => v.account.kind === "credit")
-      .map((v) => [v.account.id, -toPesos(v.balance)])
-  );
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8 sm:space-y-8">
@@ -71,119 +36,33 @@ export default async function Home() {
           <Link href="/categories" className="hover:underline">
             Categorías →
           </Link>
-          <Link href="/profile" className="text-gray-500 hover:underline">
+          <Link href="/profile" className="text-secondary-600 hover:underline dark:text-secondary-300">
             {sessionUser.username}
           </Link>
           <form action={logOutAction}>
-            <button type="submit" className="text-gray-500 hover:underline">
+            <button
+              type="submit"
+              className="text-secondary-600 hover:underline dark:text-secondary-300"
+            >
               Salir
             </button>
           </form>
         </nav>
       </div>
 
-      {/* ── Dashboard ── */}
-      <section className="space-y-3">
-        <h2 className="font-semibold text-lg">Disponible</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-lg border p-4">
-            <p className="text-xs text-secondary-600 dark:text-secondary-300 uppercase tracking-wide">Real</p>
-            <p className="mt-1 text-2xl font-bold">{formatMXN(dashboard.realAvailablePesos)}</p>
-            <p className="text-xs text-gray-400">Solo transacciones confirmadas</p>
-          </div>
-          <div className="rounded-lg border p-4">
-            <p className="text-xs text-secondary-600 dark:text-secondary-300 uppercase tracking-wide">Proyectado</p>
-            <p className="mt-1 text-2xl font-bold">{formatMXN(dashboard.netProjectedPesos)}</p>
-            <p className="text-xs text-gray-400">Patrimonio + ingresos esperados − deuda</p>
-          </div>
-        </div>
-
-        <ReconcileList
-          projections={dashboard.dueProjections.map((p) => ({
-            id: p.id,
-            concept: p.concept,
-            occurredAtISO: p.occurredAt.toISOString(),
-            expectedPesos: p.expectedPesos,
-            accountName: p.accountName,
-          }))}
-        />
-
-        {dashboard.netWorthAccounts.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between">
-              <h3 className="font-medium text-sm text-secondary-600 dark:text-secondary-300">
-                Patrimonio
-              </h3>
-              <p className="text-sm font-semibold">{formatMXN(netWorthTotal)}</p>
-            </div>
-            {dashboard.netWorthAccounts.map((row) => {
-              const meta = ACCOUNT_KIND_META[row.kind];
-              return (
-                <div
-                  key={row.id}
-                  className="flex items-center justify-between rounded-lg border px-4 py-3"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${meta.bgSoft}`}
-                    >
-                      <Icon
-                        icon={meta.icon}
-                        className={`h-4 w-4 ${accountKindTextClass(row.kind)}`}
-                      />
-                    </span>
-                    <div>
-                      <p className="font-medium text-sm">{row.name}</p>
-                      <p className="text-xs text-gray-400">
-                        {meta.label}
-                        {row.bank ? ` · ${row.bank}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="font-semibold text-primary-700 dark:text-primary-300">
-                    {formatMXN(row.balancePesos)}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {dashboard.creditCards.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="font-medium text-sm text-secondary-600 dark:text-secondary-300">
-              Tarjetas de crédito
-            </h3>
-            {dashboard.creditCards.map((card) => (
-              <div key={card.id} className="flex items-center justify-between rounded-lg border px-4 py-3">
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${ACCOUNT_KIND_META.credit.bgSoft}`}
-                  >
-                    <Icon icon={ACCOUNT_KIND_META.credit.icon} className={`h-4 w-4 ${accountKindTextClass("credit")}`} />
-                  </span>
-                  <div>
-                    <p className="font-medium text-sm">{card.name}</p>
-                    <p className="text-xs text-gray-400">
-                      Vence {card.nextDue.toLocaleDateString("es-MX")}
-                    </p>
-                  </div>
-                </div>
-                <p className="font-semibold text-red-600">
-                  {formatMXN(creditBalanceByAccountId.get(card.id) ?? card.owedPesos)}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ── Capture form ── */}
-      <CaptureForm
-        accounts={accounts.map((a) => ({ id: a.id, name: a.name, kind: a.kind }))}
-        incomeCategories={incomeCategories.map((c) => ({ id: c.id, name: c.name }))}
-        expenseCategories={expenseCategories.map((c) => ({ id: c.id, name: c.name }))}
+      {/* Proyecciones de ingreso vencidas (plan tipo "Proyección") por conciliar
+          antes que nada — necesitan el monto real del usuario. */}
+      <ReconcileList
+        projections={legacyDashboard.dueProjections.map((p) => ({
+          id: p.id,
+          concept: p.concept,
+          occurredAtISO: p.occurredAt.toISOString(),
+          expectedPesos: p.expectedPesos,
+          accountName: p.accountName,
+        }))}
       />
+
+      <Dashboard data={data} />
     </main>
   );
 }

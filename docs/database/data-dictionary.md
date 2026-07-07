@@ -15,6 +15,7 @@ documented here as a first-class entity.
 | --- | --- |
 | `account_kind` | cash, debit, investment, credit |
 | `budget_subtype` | category_cap, savings_reservation, purchase_goal |
+| `income_frequency` | weekly, biweekly, semimonthly, monthly |
 | `ledger_entry_kind` | income, expense, transfer |
 | `ledger_entry_status` | cleared, projected |
 | `purchase_horizon` | short, medium, long |
@@ -230,6 +231,52 @@ Indexes:
 - `idx_income_category_is_active` — btree (`is_active`) WHERE `is_active = true`.
 
 RLS: enabled; policy `income_category_select_mcp_readonly` FOR SELECT USING (true) TO
+`mcp_readonly`.
+
+## Table: `income_schedule`
+
+Recurring income configuration per user (e.g. payroll). `frequency` is the `income_frequency`
+enum (`weekly`, `biweekly`, `semimonthly`, `monthly`); `semimonthly` means day 15 **and** the last
+day of the month, anchored by `anchor_date`. Occurrences are computed in memory (recurrence
+engine) and **never materialized** — when a payday arrives the app asks for the real amount and
+writes it as a `ledger_entry` (`kind = income`, `status = cleared`); there is intentionally **no
+FK** between `ledger_entry` and `income_schedule`. `estimated_amount` is in centavos and only
+feeds projections. Added in `0008_steady_sister_grimm`.
+
+| Column | Type | Nullable | Key | Default | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `account_id` | integer | NO | FK | | FK → `account.id`, ON DELETE RESTRICT; destination account of the income. |
+| `anchor_date` | date | NO | | | Reference payday that anchors the recurrence series. |
+| `created_at` | timestamptz | NO | | `now()` | |
+| `estimated_amount` | integer | NO | | | Centavos; must be `> 0`. Projection only — real amounts live in `ledger_entry`. |
+| `frequency` | income_frequency | NO | | | Enum: weekly, biweekly, semimonthly, monthly. |
+| `id` | integer | NO | PK | identity | `GENERATED ALWAYS AS IDENTITY`. |
+| `income_category_id` | integer | YES | FK | | FK → `income_category.id`; optional default category for the generated income entries. |
+| `is_active` | boolean | NO | | `true` | Partial index on `is_active = true`. |
+| `name` | varchar(100) | NO | | | |
+| `updated_at` | timestamptz | NO | | `now()` | |
+| `user_id` | uuid | NO | FK | | FK → `auth.users.id`, ON DELETE CASCADE. |
+
+Constraints:
+
+- `income_schedule_pkey` — PRIMARY KEY (`id`).
+- `income_schedule_user_id_users_id_fk` — FK (`user_id`) → `auth.users(id)`, ON DELETE CASCADE,
+  ON UPDATE no action.
+- `income_schedule_account_id_account_id_fk` — FK (`account_id`) → `account(id)`, ON DELETE
+  RESTRICT, ON UPDATE no action.
+- `income_schedule_income_category_id_income_category_id_fk` — FK (`income_category_id`) →
+  `income_category(id)`, ON DELETE no action, ON UPDATE no action.
+- `chk_income_schedule_amount_pos` — `estimated_amount > 0`.
+
+Indexes:
+
+- `income_schedule_pkey` — UNIQUE btree (`id`).
+- `idx_income_schedule_account_id` — btree (`account_id`).
+- `idx_income_schedule_user_active` — btree (`user_id`) WHERE `is_active = true`. The hot
+  dashboard-projection read.
+- `idx_income_schedule_user_id` — btree (`user_id`).
+
+RLS: enabled; policy `income_schedule_select_mcp_readonly` FOR SELECT USING (true) TO
 `mcp_readonly`.
 
 ## Table: `ledger_entry`

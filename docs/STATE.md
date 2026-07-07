@@ -105,11 +105,28 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   saldo firmado, deuda = negativo). Fix: `OnboardingWizard`/`AccountManager` etiquetan "Deuda
   actual" para crédito y guardan el monto negado; migración data-only
   `0009_fix_credit_opening_sign` reparó las filas existentes (valores previos en el SQL).
-- **Next**: pendientes:
-  gestión de espacios (crear/invitar/exponer cuentas), marca de cuenta de nómina + proyección de
-  próximo ingreso (ver visión en memoria del usuario), configurar "Secure email change" OFF +
-  Redirect URLs en el dashboard de Supabase (bloquea la verificación E2E del ciclo de correo del
-  plan `auth-profile-recovery`).
+- **Dashboard restructure** (`dashboard-restructure`, complete) -- `/` re-estructurado como centro
+  de navegación: saldo actual (Σ balances derivados de todas las cuentas activas, crédito
+  incluido en negativo), línea de tiempo interactiva de saldo (`BalanceTimeline`, SVG propio,
+  hoy−10/+30 visibles con drag hasta hoy−40/+30, tooltip, tap→detalle del día editable),
+  saldos por cuenta agrupados efectivo→débito→inversión→crédito con captura contextual
+  (`EntryModal`: ingreso con pregunta de cuenta origen, ajuste de saldo en inversión,
+  pago/liquidar en crédito), y barras de presupuesto del plan vigente con detalle y captura por
+  categoría. Nueva tabla `income_schedule` (migración `0010_lovely_princess_powerful`, aplicada) para ingresos
+  recurrentes (`weekly`/`biweekly`/`semimonthly` = día 15 y fin de mes/`monthly`); el monto es un
+  ESTIMADO -- el día de pago la app pide el monto real (`confirmPaydayAction`, dedupe ±3 días
+  re-verificado server-side) y lo escribe como `ledger_entry` income cleared, sin FK entre ambos.
+  Proyección futura del saldo = projected + ocurrencias estimadas de ingreso + quema lineal del
+  remanente de cada `category_cap` vigente (dominio puro en
+  `src/domain/{income-recurrence,timeline}.ts`, 25 tests; renombrado desde `recurrence.ts` para no
+  chocar con el motor de gastos fijos del plan anterior, que se quedó con ese nombre). El
+  `ReconcileList`/"Por conciliar" y "Patrimonio" de `plan-types-dashboard-neto` se conservan
+  arriba del nuevo dashboard (`getDashboard()` sigue viva junto a `getDashboardV2()`);
+  `CaptureForm.tsx` quedó reemplazado por `EntryModal`.
+- **Next**: gestión de espacios (crear/invitar/exponer cuentas), marca de cuenta de nómina +
+  proyección de próximo ingreso (ver visión en memoria del usuario), configurar "Secure email
+  change" OFF + Redirect URLs en el dashboard de Supabase (bloquea la verificación E2E del ciclo
+  de correo del plan `auth-profile-recovery`).
 
 ## Active risks
 

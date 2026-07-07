@@ -2,6 +2,35 @@
 
 > Append-only. Each entry: date, what changed, and why. `docs-sync` appends; history is never rewritten.
 
+## 2026-07-07 — `0010_lovely_princess_powerful` (income_schedule: recurring income config) — applied: true
+
+- Created enum `income_frequency` (`weekly`, `biweekly`, `semimonthly`, `monthly`). `semimonthly`
+  (quincenal) means **the 15th AND the last day of the month** — "15 y 30" is undefined in February
+  and 15/end-of-month is the real Mexican payroll convention.
+- Created table `income_schedule`: identity PK; `user_id uuid` NOT NULL → FK `auth.users(id)`
+  ON DELETE CASCADE (disposable user configuration, like `plan`); `name` varchar(100);
+  `frequency`; `estimated_amount` integer centavos with `chk_income_schedule_amount_pos` (`> 0`);
+  `account_id` NOT NULL → FK `account(id)` ON DELETE RESTRICT (destination account; accounts are
+  deactivated, never deleted); `income_category_id` nullable → FK `income_category(id)`;
+  `anchor_date date` NOT NULL (immutable anchor — occurrences are derived in memory, never
+  materialized; nothing is projected before it); `is_active` default true; timestamps.
+- Indexes: partial `idx_income_schedule_user_active` (`user_id` WHERE `is_active = true`, the hot
+  dashboard-projection read), `idx_income_schedule_user_id`, `idx_income_schedule_account_id`
+  (reverse lookup when deactivating the destination account).
+- RLS enabled + policy `income_schedule_select_mcp_readonly` FOR SELECT TO `mcp_readonly` +
+  hand-added `GRANT SELECT` (drizzle-kit does not manage grants). Verified live post-apply: the
+  `db` MCP (`mcp_readonly`) can SELECT the table (0 rows, no error).
+- **Reversible** — 100 % additive; rollback is `DROP TABLE income_schedule; DROP TYPE
+  income_frequency;`. No existing table, enum, index, policy, or grant was touched.
+- **Renumbered from the original `0008_steady_sister_grimm`** drafted during planning: while this
+  plan was in flight, `0008`/`0009` were claimed on `main` by the concurrent
+  `plan-types-dashboard-neto` plan (`0008_shallow_ricochet`, `0009_fix_credit_opening_sign`) — the
+  dev DB is shared, so the schema was regenerated on top of that merged history instead of
+  reusing the stale tag.
+- Why: plan `dashboard-restructure` — the balance-timeline projection needs the user's expected
+  recurring income(s); on payday the app asks the real amount and writes an income/cleared
+  `ledger_entry` (no FK between schedule and entry).
+
 ## 2026-07-06 — `0009_fix_credit_opening_sign` (data fix: credit debt sign) — applied: true
 
 - **Data-only migration, no DDL**: `UPDATE account SET opening_balance = -opening_balance WHERE

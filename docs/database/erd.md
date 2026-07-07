@@ -55,6 +55,20 @@ erDiagram
         timestamptz created_at "NOT NULL, default now()"
     }
 
+    income_schedule {
+        integer id PK "GENERATED ALWAYS AS IDENTITY"
+        uuid user_id FK "NOT NULL, ON DELETE CASCADE"
+        varchar name "NOT NULL, max 100"
+        income_frequency frequency "NOT NULL"
+        integer estimated_amount "NOT NULL, > 0, centavos, projection only"
+        integer account_id FK "NOT NULL, destination, ON DELETE RESTRICT"
+        integer income_category_id FK "nullable, default category"
+        date anchor_date "NOT NULL, anchors the recurrence series"
+        boolean is_active "NOT NULL, default true"
+        timestamptz created_at "NOT NULL, default now()"
+        timestamptz updated_at "NOT NULL, default now()"
+    }
+
     ledger_entry {
         integer id PK "GENERATED ALWAYS AS IDENTITY"
         uuid user_id FK "NOT NULL, denormalized from account.user_id, ON DELETE RESTRICT"
@@ -135,6 +149,8 @@ erDiagram
     fixed_expense ||--o{ ledger_entry : "fixed_expense_id (set null)"
     account ||--o{ fixed_expense : "account_id (restrict)"
     expense_category ||--o{ fixed_expense : "expense_category_id (restrict)"
+    account ||--o{ income_schedule : "account_id (destination, restrict)"
+    income_category ||--o{ income_schedule : "income_category_id (optional)"
     plan ||--o{ budget : "plan_id (cascade)"
     expense_category ||--o{ budget : "expense_category_id (category_cap)"
     account ||--o{ budget : "account_id (savings_reservation)"
@@ -142,6 +158,7 @@ erDiagram
     profile ||--o{ account : "auth.users.id -> account.user_id (external)"
     profile ||--o{ plan : "auth.users.id -> plan.user_id (external)"
     profile ||--o{ ledger_entry : "auth.users.id -> ledger_entry.user_id (external)"
+    profile ||--o{ income_schedule : "auth.users.id -> income_schedule.user_id (external, cascade)"
     profile ||--o{ fixed_expense : "auth.users.id -> fixed_expense.user_id (external)"
     space ||--o{ space_member : "space_id (cascade)"
     space ||--o{ space_account : "space_id (cascade)"
@@ -152,19 +169,21 @@ erDiagram
 
 ## Notes
 
-- Enums: `account_kind` = (cash, debit, investment, credit); `ledger_entry_kind` =
+- Enums: `account_kind` = (cash, debit, investment, credit); `income_frequency` =
+  (weekly, biweekly, semimonthly, monthly); `ledger_entry_kind` =
   (income, expense, transfer); `ledger_entry_status` = (cleared, projected);
   `budget_subtype` = (category_cap, savings_reservation, purchase_goal);
   `purchase_horizon` = (short, medium, long); `space_role` = (owner, member).
 - All foreign keys use `ON DELETE no action ON UPDATE no action`, except: `budget.plan_id` →
   `plan` (`cascade`); `account.user_id` → `auth.users` (`restrict`); `plan.user_id` →
   `auth.users` (`cascade`); `ledger_entry.user_id` → `auth.users` (`restrict`);
-  `ledger_entry.fixed_expense_id` → `fixed_expense` (`set null`); `fixed_expense.user_id` →
-  `auth.users` (`cascade`); `fixed_expense.account_id` → `account` (`restrict`);
-  `fixed_expense.expense_category_id` → `expense_category` (`restrict`);
+  `ledger_entry.fixed_expense_id` → `fixed_expense` (`set null`);
   `profile.user_id` → `auth.users` (`cascade`); `space.created_by` → `auth.users` (`set null`);
   `space_member.*` → `space`/`auth.users` (`cascade`); `space_account.space_id`/`account_id` →
-  `space`/`account` (`cascade`).
+  `space`/`account` (`cascade`); `income_schedule.user_id` → `auth.users` (`cascade`);
+  `income_schedule.account_id` → `account` (`restrict`); `fixed_expense.user_id` → `auth.users`
+  (`cascade`); `fixed_expense.account_id`/`expense_category_id` → `account`/`expense_category`
+  (`restrict`).
 - `auth.users` is a Supabase-managed table outside `public` (declared in Drizzle only so
   `public` tables can FK to it; `drizzle-kit` never manages it — see `schemaFilter: ["public"]`
   in `drizzle.config.ts`). The `profile ||--o{ ...` edges above are drawn from `profile` as a
@@ -177,7 +196,13 @@ erDiagram
   `ledger-write` (not by a DB trigger — the schema stays declarative). Cross-user transfers
   (`to_account_id` owned by a different user) are rejected in `ledger-write`, not by a DB
   constraint.
-- RLS is enabled on all 11 `public` tables but **no per-user policies exist yet** — isolation is
+- `income_schedule` (migration `0010_lovely_princess_powerful`) holds recurring-income config (payroll etc.). Occurrences
+  are computed **in memory** from `frequency` + `anchor_date` (`semimonthly` = day 15 and last day
+  of month) and are never materialized; on payday the app asks for the real amount and writes a
+  `ledger_entry` (`kind = income`, `status = cleared`) — deliberately **no FK** between
+  `ledger_entry` and `income_schedule`, so the schedule has no incoming relationships.
+  `estimated_amount` (centavos) only feeds projections.
+- RLS is enabled on all 12 `public` tables but **no per-user policies exist yet** — isolation is
   enforced entirely in the server-action/repo layer (`WHERE user_id = session.userId`). Every
   table has exactly one policy, `<table>_select_mcp_readonly FOR SELECT USING (true)`, scoped to
   the `mcp_readonly` role used by the `db` MCP.

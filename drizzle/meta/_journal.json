@@ -71,6 +71,13 @@
       "when": 1783364941485,
       "tag": "0009_fix_credit_opening_sign",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783464301130,
+      "tag": "0010_lovely_princess_powerful",
+      "breakpoints": true
     }
   ]
 }

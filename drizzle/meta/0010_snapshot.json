@@ -1,0 +1,2052 @@
+{
+  "id": "26060734-d5d1-4fc9-9997-14f2ba933edd",
+  "prevId": "df0dc889-e9fb-4ece-8b1a-b4d2f6a80cb5",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.account": {
+      "name": "account",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "account_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "account_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "opening_balance": {
+          "name": "opening_balance",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "cutoff_day": {
+          "name": "cutoff_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payment_day": {
+          "name": "payment_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "credit_limit": {
+          "name": "credit_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bank": {
+          "name": "bank",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "number": {
+          "name": "number",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expiration_date": {
+          "name": "expiration_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_account_is_active": {
+          "name": "idx_account_is_active",
+          "columns": [
+            {
+              "expression": "is_active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"account\".\"is_active\" = TRUE",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_account_user_id": {
+          "name": "idx_account_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "account_user_id_users_id_fk": {
+          "name": "account_user_id_users_id_fk",
+          "tableFrom": "account",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "account_select_mcp_readonly": {
+          "name": "account_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "chk_credit_fields": {
+          "name": "chk_credit_fields",
+          "value": "(\"account\".\"kind\" = 'credit' AND \"account\".\"cutoff_day\" IS NOT NULL AND \"account\".\"payment_day\" IS NOT NULL)\n          OR (\"account\".\"kind\" <> 'credit' AND \"account\".\"cutoff_day\" IS NULL AND \"account\".\"payment_day\" IS NULL AND \"account\".\"credit_limit\" IS NULL)"
+        },
+        "chk_cutoff_day_range": {
+          "name": "chk_cutoff_day_range",
+          "value": "\"account\".\"cutoff_day\" BETWEEN 1 AND 28"
+        },
+        "chk_payment_day_range": {
+          "name": "chk_payment_day_range",
+          "value": "\"account\".\"payment_day\" BETWEEN 1 AND 28"
+        },
+        "chk_cutoff_ne_payment": {
+          "name": "chk_cutoff_ne_payment",
+          "value": "\"account\".\"cutoff_day\" <> \"account\".\"payment_day\""
+        },
+        "chk_cash_no_bank_fields": {
+          "name": "chk_cash_no_bank_fields",
+          "value": "\"account\".\"kind\" <> 'cash' OR (\"account\".\"bank\" IS NULL AND \"account\".\"number\" IS NULL AND \"account\".\"expiration_date\" IS NULL)"
+        },
+        "chk_credit_limit_pos": {
+          "name": "chk_credit_limit_pos",
+          "value": "\"account\".\"credit_limit\" IS NULL OR \"account\".\"credit_limit\" > 0"
+        },
+        "chk_number_masked": {
+          "name": "chk_number_masked",
+          "value": "\"account\".\"number\" IS NULL OR \"account\".\"number\" !~ '^[0-9]{13,19}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "auth.users": {
+      "name": "users",
+      "schema": "auth",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.budget": {
+      "name": "budget",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "budget_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "plan_id": {
+          "name": "plan_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subtype": {
+          "name": "subtype",
+          "type": "budget_subtype",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_amount": {
+          "name": "target_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_start": {
+          "name": "period_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "period_end": {
+          "name": "period_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expense_category_id": {
+          "name": "expense_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "item_name": {
+          "name": "item_name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "horizon": {
+          "name": "horizon",
+          "type": "purchase_horizon",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_budget_plan_id": {
+          "name": "idx_budget_plan_id",
+          "columns": [
+            {
+              "expression": "plan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_budget_expense_category": {
+          "name": "idx_budget_expense_category",
+          "columns": [
+            {
+              "expression": "expense_category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"budget\".\"expense_category_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_budget_account": {
+          "name": "idx_budget_account",
+          "columns": [
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"budget\".\"account_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "budget_cap_category_uq": {
+          "name": "budget_cap_category_uq",
+          "columns": [
+            {
+              "expression": "plan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expense_category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"budget\".\"subtype\" = 'category_cap'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "budget_reservation_account_uq": {
+          "name": "budget_reservation_account_uq",
+          "columns": [
+            {
+              "expression": "plan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"budget\".\"subtype\" = 'savings_reservation'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "budget_plan_id_plan_id_fk": {
+          "name": "budget_plan_id_plan_id_fk",
+          "tableFrom": "budget",
+          "tableTo": "plan",
+          "columnsFrom": [
+            "plan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "budget_expense_category_id_expense_category_id_fk": {
+          "name": "budget_expense_category_id_expense_category_id_fk",
+          "tableFrom": "budget",
+          "tableTo": "expense_category",
+          "columnsFrom": [
+            "expense_category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "budget_account_id_account_id_fk": {
+          "name": "budget_account_id_account_id_fk",
+          "tableFrom": "budget",
+          "tableTo": "account",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "budget_select_mcp_readonly": {
+          "name": "budget_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "chk_budget_target_positive": {
+          "name": "chk_budget_target_positive",
+          "value": "\"budget\".\"target_amount\" > 0"
+        },
+        "chk_budget_period_pair": {
+          "name": "chk_budget_period_pair",
+          "value": "(\"budget\".\"period_start\" IS NULL AND \"budget\".\"period_end\" IS NULL)\n          OR (\"budget\".\"period_start\" IS NOT NULL AND \"budget\".\"period_end\" IS NOT NULL AND \"budget\".\"period_end\" >= \"budget\".\"period_start\")"
+        },
+        "chk_budget_subtype_fields": {
+          "name": "chk_budget_subtype_fields",
+          "value": "\n        (\"budget\".\"subtype\" = 'category_cap' AND \"budget\".\"expense_category_id\" IS NOT NULL AND \"budget\".\"account_id\" IS NULL AND \"budget\".\"item_name\" IS NULL AND \"budget\".\"horizon\" IS NULL)\n        OR (\"budget\".\"subtype\" = 'savings_reservation' AND \"budget\".\"account_id\" IS NOT NULL AND \"budget\".\"expense_category_id\" IS NULL AND \"budget\".\"item_name\" IS NULL AND \"budget\".\"horizon\" IS NULL)\n        OR (\"budget\".\"subtype\" = 'purchase_goal' AND \"budget\".\"item_name\" IS NOT NULL AND \"budget\".\"horizon\" IS NOT NULL AND \"budget\".\"expense_category_id\" IS NULL AND \"budget\".\"account_id\" IS NULL)\n      "
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.expense_category": {
+      "name": "expense_category",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "expense_category_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_savings": {
+          "name": "is_savings",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_fixed": {
+          "name": "is_fixed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "expense_category_name_lower_uq": {
+          "name": "expense_category_name_lower_uq",
+          "columns": [
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "expense_category_savings_singleton": {
+          "name": "expense_category_savings_singleton",
+          "columns": [
+            {
+              "expression": "is_savings",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"expense_category\".\"is_savings\" = TRUE",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_expense_category_is_active": {
+          "name": "idx_expense_category_is_active",
+          "columns": [
+            {
+              "expression": "is_active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"expense_category\".\"is_active\" = TRUE",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "expense_category_select_mcp_readonly": {
+          "name": "expense_category_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "chk_expense_category_savings_fixed_excl": {
+          "name": "chk_expense_category_savings_fixed_excl",
+          "value": "NOT (\"expense_category\".\"is_savings\" AND \"expense_category\".\"is_fixed\")"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.fixed_expense": {
+      "name": "fixed_expense",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "fixed_expense_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expense_category_id": {
+          "name": "expense_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day_of_month": {
+          "name": "day_of_month",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_fixed_expense_user_active": {
+          "name": "idx_fixed_expense_user_active",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"fixed_expense\".\"is_active\" = TRUE",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fixed_expense_user_id_users_id_fk": {
+          "name": "fixed_expense_user_id_users_id_fk",
+          "tableFrom": "fixed_expense",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fixed_expense_account_id_account_id_fk": {
+          "name": "fixed_expense_account_id_account_id_fk",
+          "tableFrom": "fixed_expense",
+          "tableTo": "account",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "fixed_expense_expense_category_id_expense_category_id_fk": {
+          "name": "fixed_expense_expense_category_id_expense_category_id_fk",
+          "tableFrom": "fixed_expense",
+          "tableTo": "expense_category",
+          "columnsFrom": [
+            "expense_category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "fixed_expense_select_mcp_readonly": {
+          "name": "fixed_expense_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "chk_fixed_expense_amount_positive": {
+          "name": "chk_fixed_expense_amount_positive",
+          "value": "\"fixed_expense\".\"amount\" > 0"
+        },
+        "chk_fixed_expense_day_range": {
+          "name": "chk_fixed_expense_day_range",
+          "value": "\"fixed_expense\".\"day_of_month\" BETWEEN 1 AND 31"
+        },
+        "chk_fixed_expense_period_order": {
+          "name": "chk_fixed_expense_period_order",
+          "value": "\"fixed_expense\".\"end_date\" IS NULL OR \"fixed_expense\".\"end_date\" >= \"fixed_expense\".\"start_date\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.income_category": {
+      "name": "income_category",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "income_category_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "income_category_name_lower_uq": {
+          "name": "income_category_name_lower_uq",
+          "columns": [
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_income_category_is_active": {
+          "name": "idx_income_category_is_active",
+          "columns": [
+            {
+              "expression": "is_active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"income_category\".\"is_active\" = TRUE",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "income_category_select_mcp_readonly": {
+          "name": "income_category_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.income_schedule": {
+      "name": "income_schedule",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "income_schedule_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "frequency": {
+          "name": "frequency",
+          "type": "income_frequency",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estimated_amount": {
+          "name": "estimated_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "income_category_id": {
+          "name": "income_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "anchor_date": {
+          "name": "anchor_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_income_schedule_user_active": {
+          "name": "idx_income_schedule_user_active",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"income_schedule\".\"is_active\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_income_schedule_user_id": {
+          "name": "idx_income_schedule_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_income_schedule_account_id": {
+          "name": "idx_income_schedule_account_id",
+          "columns": [
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "income_schedule_user_id_users_id_fk": {
+          "name": "income_schedule_user_id_users_id_fk",
+          "tableFrom": "income_schedule",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "income_schedule_account_id_account_id_fk": {
+          "name": "income_schedule_account_id_account_id_fk",
+          "tableFrom": "income_schedule",
+          "tableTo": "account",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "income_schedule_income_category_id_income_category_id_fk": {
+          "name": "income_schedule_income_category_id_income_category_id_fk",
+          "tableFrom": "income_schedule",
+          "tableTo": "income_category",
+          "columnsFrom": [
+            "income_category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "income_schedule_select_mcp_readonly": {
+          "name": "income_schedule_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "chk_income_schedule_amount_pos": {
+          "name": "chk_income_schedule_amount_pos",
+          "value": "\"income_schedule\".\"estimated_amount\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.profile": {
+      "name": "profile",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "login_email": {
+          "name": "login_email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "has_real_email": {
+          "name": "has_real_email",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "email_verified_at": {
+          "name": "email_verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "profile_username_lower_uq": {
+          "name": "profile_username_lower_uq",
+          "columns": [
+            {
+              "expression": "lower(\"username\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "profile_login_email_lower_uq": {
+          "name": "profile_login_email_lower_uq",
+          "columns": [
+            {
+              "expression": "lower(\"login_email\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "profile_user_id_users_id_fk": {
+          "name": "profile_user_id_users_id_fk",
+          "tableFrom": "profile",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "profile_select_mcp_readonly": {
+          "name": "profile_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "chk_username_format": {
+          "name": "chk_username_format",
+          "value": "\"profile\".\"username\" ~ '^[a-z0-9_]{3,30}$'"
+        },
+        "chk_email_verified_real": {
+          "name": "chk_email_verified_real",
+          "value": "\"profile\".\"email_verified_at\" IS NULL OR \"profile\".\"has_real_email\""
+        },
+        "chk_login_email_domain": {
+          "name": "chk_login_email_domain",
+          "value": "(\"profile\".\"has_real_email\" AND \"profile\".\"login_email\" NOT LIKE '%@users.perfin.internal') OR (NOT \"profile\".\"has_real_email\" AND \"profile\".\"login_email\" LIKE '%@users.perfin.internal')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.space": {
+      "name": "space",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "space_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "space_created_by_users_id_fk": {
+          "name": "space_created_by_users_id_fk",
+          "tableFrom": "space",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "space_select_mcp_readonly": {
+          "name": "space_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.space_member": {
+      "name": "space_member",
+      "schema": "",
+      "columns": {
+        "space_id": {
+          "name": "space_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "space_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'member'"
+        },
+        "joined_at": {
+          "name": "joined_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_space_member_user_id": {
+          "name": "idx_space_member_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "space_member_space_id_space_id_fk": {
+          "name": "space_member_space_id_space_id_fk",
+          "tableFrom": "space_member",
+          "tableTo": "space",
+          "columnsFrom": [
+            "space_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "space_member_user_id_users_id_fk": {
+          "name": "space_member_user_id_users_id_fk",
+          "tableFrom": "space_member",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "space_member_space_id_user_id_pk": {
+          "name": "space_member_space_id_user_id_pk",
+          "columns": [
+            "space_id",
+            "user_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "space_member_select_mcp_readonly": {
+          "name": "space_member_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.space_account": {
+      "name": "space_account",
+      "schema": "",
+      "columns": {
+        "space_id": {
+          "name": "space_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "shared_by": {
+          "name": "shared_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "shared_at": {
+          "name": "shared_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_space_account_account_id": {
+          "name": "idx_space_account_account_id",
+          "columns": [
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "space_account_space_id_space_id_fk": {
+          "name": "space_account_space_id_space_id_fk",
+          "tableFrom": "space_account",
+          "tableTo": "space",
+          "columnsFrom": [
+            "space_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "space_account_account_id_account_id_fk": {
+          "name": "space_account_account_id_account_id_fk",
+          "tableFrom": "space_account",
+          "tableTo": "account",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "space_account_shared_by_users_id_fk": {
+          "name": "space_account_shared_by_users_id_fk",
+          "tableFrom": "space_account",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "shared_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "space_account_space_id_account_id_pk": {
+          "name": "space_account_space_id_account_id_pk",
+          "columns": [
+            "space_id",
+            "account_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "space_account_select_mcp_readonly": {
+          "name": "space_account_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ledger_entry": {
+      "name": "ledger_entry",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "ledger_entry_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "ledger_entry_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "ledger_entry_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "concept": {
+          "name": "concept",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_account_id": {
+          "name": "to_account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "income_category_id": {
+          "name": "income_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expense_category_id": {
+          "name": "expense_category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fixed_expense_id": {
+          "name": "fixed_expense_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fixed_expense_month": {
+          "name": "fixed_expense_month",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expected_amount": {
+          "name": "expected_amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_ledger_entry_user_account_status": {
+          "name": "idx_ledger_entry_user_account_status",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ledger_entry_occurred_at": {
+          "name": "idx_ledger_entry_occurred_at",
+          "columns": [
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ledger_entry_user_occurred_at": {
+          "name": "idx_ledger_entry_user_occurred_at",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ledger_entry_to_account": {
+          "name": "idx_ledger_entry_to_account",
+          "columns": [
+            {
+              "expression": "to_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"ledger_entry\".\"to_account_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ledger_entry_income_category": {
+          "name": "idx_ledger_entry_income_category",
+          "columns": [
+            {
+              "expression": "income_category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"ledger_entry\".\"income_category_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_ledger_entry_expense_category": {
+          "name": "idx_ledger_entry_expense_category",
+          "columns": [
+            {
+              "expression": "expense_category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"ledger_entry\".\"expense_category_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_ledger_entry_fixed_expense_month": {
+          "name": "uq_ledger_entry_fixed_expense_month",
+          "columns": [
+            {
+              "expression": "fixed_expense_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "fixed_expense_month",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"ledger_entry\".\"fixed_expense_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ledger_entry_user_id_users_id_fk": {
+          "name": "ledger_entry_user_id_users_id_fk",
+          "tableFrom": "ledger_entry",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "ledger_entry_account_id_account_id_fk": {
+          "name": "ledger_entry_account_id_account_id_fk",
+          "tableFrom": "ledger_entry",
+          "tableTo": "account",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ledger_entry_to_account_id_account_id_fk": {
+          "name": "ledger_entry_to_account_id_account_id_fk",
+          "tableFrom": "ledger_entry",
+          "tableTo": "account",
+          "columnsFrom": [
+            "to_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ledger_entry_income_category_id_income_category_id_fk": {
+          "name": "ledger_entry_income_category_id_income_category_id_fk",
+          "tableFrom": "ledger_entry",
+          "tableTo": "income_category",
+          "columnsFrom": [
+            "income_category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ledger_entry_expense_category_id_expense_category_id_fk": {
+          "name": "ledger_entry_expense_category_id_expense_category_id_fk",
+          "tableFrom": "ledger_entry",
+          "tableTo": "expense_category",
+          "columnsFrom": [
+            "expense_category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ledger_entry_fixed_expense_id_fixed_expense_id_fk": {
+          "name": "ledger_entry_fixed_expense_id_fixed_expense_id_fk",
+          "tableFrom": "ledger_entry",
+          "tableTo": "fixed_expense",
+          "columnsFrom": [
+            "fixed_expense_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "ledger_entry_select_mcp_readonly": {
+          "name": "ledger_entry_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "chk_amount_positive": {
+          "name": "chk_amount_positive",
+          "value": "\"ledger_entry\".\"amount\" > 0"
+        },
+        "chk_transfer_to_account": {
+          "name": "chk_transfer_to_account",
+          "value": "(\"ledger_entry\".\"kind\" = 'transfer' AND \"ledger_entry\".\"to_account_id\" IS NOT NULL)\n          OR (\"ledger_entry\".\"kind\" <> 'transfer' AND \"ledger_entry\".\"to_account_id\" IS NULL)"
+        },
+        "chk_no_self_transfer": {
+          "name": "chk_no_self_transfer",
+          "value": "\"ledger_entry\".\"to_account_id\" IS NULL OR \"ledger_entry\".\"to_account_id\" <> \"ledger_entry\".\"account_id\""
+        },
+        "chk_category_kind": {
+          "name": "chk_category_kind",
+          "value": "\n        (\"ledger_entry\".\"kind\" = 'income' AND \"ledger_entry\".\"expense_category_id\" IS NULL)\n        OR (\"ledger_entry\".\"kind\" = 'expense' AND \"ledger_entry\".\"income_category_id\" IS NULL)\n        OR (\"ledger_entry\".\"kind\" = 'transfer' AND \"ledger_entry\".\"income_category_id\" IS NULL AND \"ledger_entry\".\"expense_category_id\" IS NULL)\n      "
+        },
+        "chk_fixed_expense_link": {
+          "name": "chk_fixed_expense_link",
+          "value": "\"ledger_entry\".\"fixed_expense_id\" IS NULL\n          OR (\"ledger_entry\".\"kind\" = 'expense' AND \"ledger_entry\".\"fixed_expense_month\" IS NOT NULL)"
+        },
+        "chk_fixed_expense_month_day1": {
+          "name": "chk_fixed_expense_month_day1",
+          "value": "\"ledger_entry\".\"fixed_expense_month\" IS NULL OR EXTRACT(DAY FROM \"ledger_entry\".\"fixed_expense_month\") = 1"
+        },
+        "chk_expected_amount_income": {
+          "name": "chk_expected_amount_income",
+          "value": "\"ledger_entry\".\"expected_amount\" IS NULL OR (\"ledger_entry\".\"kind\" = 'income' AND \"ledger_entry\".\"expected_amount\" > 0)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.plan": {
+      "name": "plan",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "plan_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_start": {
+          "name": "period_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_end": {
+          "name": "period_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_plan_user_id": {
+          "name": "idx_plan_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "plan_user_id_users_id_fk": {
+          "name": "plan_user_id_users_id_fk",
+          "tableFrom": "plan",
+          "tableTo": "users",
+          "schemaTo": "auth",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "plan_select_mcp_readonly": {
+          "name": "plan_select_mcp_readonly",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "mcp_readonly"
+          ],
+          "using": "true"
+        }
+      },
+      "checkConstraints": {
+        "chk_plan_period_order": {
+          "name": "chk_plan_period_order",
+          "value": "\"plan\".\"period_end\" >= \"plan\".\"period_start\""
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.account_kind": {
+      "name": "account_kind",
+      "schema": "public",
+      "values": [
+        "cash",
+        "debit",
+        "investment",
+        "credit"
+      ]
+    },
+    "public.budget_subtype": {
+      "name": "budget_subtype",
+      "schema": "public",
+      "values": [
+        "category_cap",
+        "savings_reservation",
+        "purchase_goal"
+      ]
+    },
+    "public.purchase_horizon": {
+      "name": "purchase_horizon",
+      "schema": "public",
+      "values": [
+        "short",
+        "medium",
+        "long"
+      ]
+    },
+    "public.income_frequency": {
+      "name": "income_frequency",
+      "schema": "public",
+      "values": [
+        "weekly",
+        "biweekly",
+        "semimonthly",
+        "monthly"
+      ]
+    },
+    "public.space_role": {
+      "name": "space_role",
+      "schema": "public",
+      "values": [
+        "owner",
+        "member"
+      ]
+    },
+    "public.ledger_entry_kind": {
+      "name": "ledger_entry_kind",
+      "schema": "public",
+      "values": [
+        "income",
+        "expense",
+        "transfer"
+      ]
+    },
+    "public.ledger_entry_status": {
+      "name": "ledger_entry_status",
+      "schema": "public",
+      "values": [
+        "cleared",
+        "projected"
+      ]
+    }
+  },
+  "schemas": {
+    "auth": "auth"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
