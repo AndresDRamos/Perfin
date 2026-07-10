@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "./db";
 import { account, ledgerEntry, NewLedgerEntry, LedgerEntryRow } from "./schema";
 
@@ -192,6 +192,24 @@ export async function reconcileWithAmount(
     .where(and(eq(ledgerEntry.id, id), eq(ledgerEntry.userId, userId)))
     .returning();
   return row;
+}
+
+// Borra una proyección de ingreso (pendiente o ya conciliada). Acotado a
+// kind=income + expected_amount NOT NULL para no poder borrar una entry
+// normal por esta vía.
+export async function deleteProjection(userId: string, id: number): Promise<void> {
+  const rows = await db
+    .delete(ledgerEntry)
+    .where(
+      and(
+        eq(ledgerEntry.id, id),
+        eq(ledgerEntry.userId, userId),
+        eq(ledgerEntry.kind, "income"),
+        isNotNull(ledgerEntry.expectedAmount)
+      )
+    )
+    .returning({ id: ledgerEntry.id });
+  if (rows.length === 0) throw new Error(`projection ${id} not found`);
 }
 
 // Idempotent: projected → cleared. No-op if already cleared.

@@ -9,6 +9,7 @@ import {
   reconcile,
   createProjection,
   reconcileWithAmount,
+  deleteProjection,
 } from "@/data/ledger-write";
 import {
   allAccountsForAvailable,
@@ -81,6 +82,14 @@ export async function reconcileProjectionAction(id: number, realPesos: number) {
   } catch (e) {
     return { ok: false as const, error: e instanceof Error ? e.message : "Error" };
   }
+  revalidatePath("/");
+  revalidatePath("/plans");
+  return { ok: true as const };
+}
+
+export async function deleteProjectionAction(id: number) {
+  const { userId } = await requireSessionUser();
+  await deleteProjection(userId, id);
   revalidatePath("/");
   revalidatePath("/plans");
   return { ok: true as const };

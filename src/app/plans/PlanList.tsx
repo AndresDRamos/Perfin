@@ -3,7 +3,7 @@
 import { useState, useActionState, useTransition } from "react";
 import { Icon } from "@iconify/react";
 import { createPlanAction, deletePlanAction } from "@/app/actions/budgets";
-import { createProjectionAction } from "@/app/actions/ledger";
+import { createProjectionAction, deleteProjectionAction } from "@/app/actions/ledger";
 import {
   createFixedExpenseAction,
   setFixedExpenseActiveAction,
@@ -449,7 +449,8 @@ function PlanRowItem({ plan }: { plan: PlanRow }) {
 }
 
 function ProjectionRowItem({ p }: { p: ProjectionView }) {
-  const pending = p.status === "projected";
+  const [pending, startTransition] = useTransition();
+  const isPending = p.status === "projected";
   const diff = p.realPesos - p.expectedPesos;
   return (
     <div className="rounded-lg border px-4 py-3">
@@ -464,35 +465,51 @@ function ProjectionRowItem({ p }: { p: ProjectionView }) {
         </div>
         <span
           className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${
-            pending
+            isPending
               ? "bg-mustard-100 text-mustard-700 dark:bg-mustard-900 dark:text-mustard-300"
               : "bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300"
           }`}
         >
-          {pending ? "Pendiente" : "Conciliada"}
+          {isPending ? "Pendiente" : "Conciliada"}
         </span>
       </div>
-      <p className="mt-1 text-sm">
-        {pending ? (
-          <>Esperado: {formatMXN(p.expectedPesos)}</>
-        ) : (
-          <>
-            Esperado {formatMXN(p.expectedPesos)} · Real {formatMXN(p.realPesos)}
-            {diff !== 0 && (
-              <span
-                className={
-                  diff > 0
-                    ? "ml-1 text-primary-700 dark:text-primary-300"
-                    : "ml-1 text-red-600 dark:text-red-400"
-                }
-              >
-                ({diff > 0 ? "+" : ""}
-                {formatMXN(diff)})
-              </span>
-            )}
-          </>
-        )}
-      </p>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <p className="text-sm">
+          {isPending ? (
+            <>Esperado: {formatMXN(p.expectedPesos)}</>
+          ) : (
+            <>
+              Esperado {formatMXN(p.expectedPesos)} · Real {formatMXN(p.realPesos)}
+              {diff !== 0 && (
+                <span
+                  className={
+                    diff > 0
+                      ? "ml-1 text-primary-700 dark:text-primary-300"
+                      : "ml-1 text-red-600 dark:text-red-400"
+                  }
+                >
+                  ({diff > 0 ? "+" : ""}
+                  {formatMXN(diff)})
+                </span>
+              )}
+            </>
+          )}
+        </p>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            if (confirm(`¿Eliminar la proyección "${p.concept ?? "Ingreso proyectado"}"?`)) {
+              startTransition(() => {
+                void deleteProjectionAction(p.id);
+              });
+            }
+          }}
+          className="shrink-0 text-xs text-red-500 hover:underline disabled:opacity-50"
+        >
+          Eliminar
+        </button>
+      </div>
     </div>
   );
 }
