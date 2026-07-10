@@ -5,6 +5,7 @@ import { listAccountsWithBalances } from "@/data/account-repo";
 import { listEntriesForUser } from "@/data/ledger-repo";
 import { listActiveIncomeSchedules } from "@/data/income-schedule-repo";
 import { listPlans, planProgress } from "@/data/budget-repo";
+import { listFixedExpenses } from "@/data/fixed-expense-repo";
 import {
   listActiveIncomeCategories,
   listActiveExpenseCategories,
@@ -13,9 +14,10 @@ import {
 } from "@/data/category-repo";
 import { toSignedLegs } from "@/data/ledger-mapping";
 import { LedgerEntryRow } from "@/data/schema";
-import { money, toPesos, add, ZERO, Money } from "@/domain/money";
+import { money, toPesos, add, negate, ZERO, Money } from "@/domain/money";
 import { addDays, ISODate } from "@/domain/dates";
 import { occurrencesBetween, IncomeFrequency } from "@/domain/income-recurrence";
+import { occurrencesBetween as fixedExpenseOccurrencesBetween } from "@/domain/recurrence";
 import {
   buildBalanceSeries,
   CategoryBurn,
@@ -122,17 +124,27 @@ export async function getDashboardV2(): Promise<DashboardV2Data> {
   const seriesFrom = addDays(today, -SERIES_PAST_DAYS);
   const seriesTo = addDays(today, SERIES_FUTURE_DAYS);
 
-  const [accountViews, entries, schedules, plans, incomeCats, expenseCats, allIncomeCats, allExpenseCats] =
-    await Promise.all([
-      listAccountsWithBalances(userId),
-      listEntriesForUser(userId),
-      listActiveIncomeSchedules(userId),
-      listPlans(userId),
-      listActiveIncomeCategories(),
-      listActiveExpenseCategories(),
-      listAllIncomeCategories(),
-      listAllExpenseCategories(),
-    ]);
+  const [
+    accountViews,
+    entries,
+    schedules,
+    fixedExpenses,
+    plans,
+    incomeCats,
+    expenseCats,
+    allIncomeCats,
+    allExpenseCats,
+  ] = await Promise.all([
+    listAccountsWithBalances(userId),
+    listEntriesForUser(userId),
+    listActiveIncomeSchedules(userId),
+    listFixedExpenses(userId),
+    listPlans(userId),
+    listActiveIncomeCategories(),
+    listActiveExpenseCategories(),
+    listAllIncomeCategories(),
+    listAllExpenseCategories(),
+  ]);
 
   const activeViews = accountViews.filter((v) => v.account.isActive);
   const activeIds = new Set(activeViews.map((v) => v.account.id));
@@ -154,6 +166,19 @@ export async function getDashboardV2(): Promise<DashboardV2Data> {
       if (!activeIds.has(leg.accountId)) continue;
       const bucket = row.status === "cleared" ? clearedLegs : projectedLegs;
       bucket.push({ date, amount: leg.entry.amount });
+    }
+  }
+
+  // Future occurrences of active fixed-expense templates: materializeDueFixedExpenses
+  // (run by getDashboard() before this, per page.tsx) only inserts ledger_entry rows
+  // for occurrences <= today, so a next charge dated after today has no row yet and
+  // would otherwise be invisible to the curve. Mirrors the income_schedule projection
+  // below; no dedupe needed since only <= today gets materialized.
+  for (const t of fixedExpenses) {
+    if (!t.isActive || !activeIds.has(t.accountId)) continue;
+    const spec = { dayOfMonth: t.dayOfMonth, startDate: t.startDate, endDate: t.endDate };
+    for (const occ of fixedExpenseOccurrencesBetween(spec, addDays(today, 1), seriesTo)) {
+      projectedLegs.push({ date: occ.date, amount: negate(money(t.amount)) });
     }
   }
 
