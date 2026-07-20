@@ -26,7 +26,7 @@ export function ForgotPasswordForm() {
           Si la cuenta tiene un correo asociado, enviamos un enlace para restablecer la
           contraseña. El enlace expira pronto; si no llega, revisa spam o intenta de nuevo.
         </p>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-text-muted">
           <Link href="/login" className="text-primary-700 hover:underline dark:text-primary-400">
             Volver a iniciar sesión
           </Link>
@@ -39,7 +39,7 @@ export function ForgotPasswordForm() {
     <form action={action} className="space-y-4 rounded-lg border p-6">
       <div>
         <h2 className="font-medium">Recuperar contraseña</h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-text-muted mt-1">
           Te enviaremos un enlace al correo asociado a tu cuenta.
         </p>
       </div>
@@ -57,7 +57,7 @@ export function ForgotPasswordForm() {
           className="mt-1 w-full rounded border px-3 py-2 text-sm"
         />
         {state.errors?.identifier && (
-          <p className="text-red-600 text-xs mt-1">{state.errors.identifier[0]}</p>
+          <p className="text-negative text-xs mt-1">{state.errors.identifier[0]}</p>
         )}
       </div>
 
@@ -69,7 +69,7 @@ export function ForgotPasswordForm() {
         {pending ? "Enviando…" : "Enviar enlace"}
       </button>
 
-      <p className="text-center text-sm text-gray-500">
+      <p className="text-center text-sm text-text-muted">
         <Link href="/login" className="text-primary-700 hover:underline dark:text-primary-400">
           Volver a iniciar sesión
         </Link>

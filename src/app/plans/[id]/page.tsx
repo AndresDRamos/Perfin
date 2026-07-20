@@ -22,7 +22,7 @@ export default async function PlanDetailPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{progress.plan.name}</h1>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-text-muted">
             {progress.plan.periodStart} → {progress.plan.periodEnd}
           </p>
         </div>
