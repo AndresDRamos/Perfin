@@ -61,7 +61,7 @@ export function PaydayPrompt({ payday }: { payday: PendingPayday }) {
           {pending ? "…" : "Registrar"}
         </button>
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-negative">{error}</p>}
     </div>
   );
 }

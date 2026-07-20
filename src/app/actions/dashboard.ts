@@ -86,6 +86,11 @@ export interface DashboardV2Data {
   seriesTo: ISODate;
   series: { date: ISODate; balancePesos: number }[];
   entriesByDay: Record<ISODate, EntryView[]>;
+  // Historial completo por cuenta (transferencias aparecen en ambas cuentas) y
+  // por categoría de gasto — alimentan las filas expandibles del dashboard y la
+  // vista de transacciones; orden: más reciente primero.
+  entriesByAccount: Record<number, EntryView[]>;
+  entriesByCategory: Record<number, EntryView[]>;
   accounts: AccountCardView[];
   schedules: ScheduleView[];
   pendingPaydays: PendingPayday[];
@@ -299,6 +304,26 @@ export async function getDashboardV2(): Promise<DashboardV2Data> {
     (entriesByDay[date] ??= []).push(toEntryView(row, date, accountNameById, incomeCatNameById, expenseCatNameById));
   }
 
+  // Full history per account / expense category (most-recent first). Transfers
+  // land in both accounts' buckets; the client derives the sign per context.
+  const entriesByAccount: Record<number, EntryView[]> = {};
+  const entriesByCategory: Record<number, EntryView[]> = {};
+  const sortedRows = [...entries].sort((a, b) =>
+    a.occurredAt.getTime() !== b.occurredAt.getTime()
+      ? b.occurredAt.getTime() - a.occurredAt.getTime()
+      : b.id - a.id
+  );
+  for (const row of sortedRows) {
+    const view = toEntryView(row, dayOf(row.occurredAt), accountNameById, incomeCatNameById, expenseCatNameById);
+    if (activeIds.has(row.accountId)) (entriesByAccount[row.accountId] ??= []).push(view);
+    if (row.toAccountId !== null && activeIds.has(row.toAccountId)) {
+      (entriesByAccount[row.toAccountId] ??= []).push(view);
+    }
+    if (row.kind === "expense" && row.expenseCategoryId !== null) {
+      (entriesByCategory[row.expenseCategoryId] ??= []).push(view);
+    }
+  }
+
   return {
     today,
     currentBalancePesos: toPesos(currentBalance),
@@ -306,6 +331,8 @@ export async function getDashboardV2(): Promise<DashboardV2Data> {
     seriesTo,
     series,
     entriesByDay,
+    entriesByAccount,
+    entriesByCategory,
     accounts: activeViews.map((v) => ({
       id: v.account.id,
       name: v.account.name,
