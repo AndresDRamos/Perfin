@@ -9,3 +9,4 @@ conflate two plans under one filename.
 | --- | --- | --- | --- | --- |
 | 2026-07-06 | onboarding-dashboard-branding | feat | committed | Onboarding wizard, dashboard visual y branding (ADR-009) |
 | 2026-07-06 | dashboard-restructure | feat | approved | Dashboard como centro de navegación: saldo actual, timeline −10/+30 días, saldos por cuenta con captura contextual, barras de budgets; tabla `income_schedule` (migración 0008) |
+| 2026-07-19 | design-system-mobile-kit | feat | committed | Implementación del proyecto claude.ai/design "Perfin Design System": tokens (charcoal, Manrope), primitivas UI compartidas, dashboard re-estructurado con filas expandibles y modales morph, onboarding de 5 pasos |

@@ -39,25 +39,46 @@ ledger balance. Onboarding (`/onboarding`) and the dashboard consume the shared 
   `deriveBalance`; see `ledger`).
 - Server actions: `src/app/actions/accounts.ts`. UI: `/accounts` (list split liquid vs credit,
   per-type config forms, activate/deactivate; type chip uses the branding icon/color).
-- **Onboarding** (`/onboarding`, `src/app/onboarding/`): 3-step guided flow (cash -> bank accounts
-  -> summary) for a brand-new user, calling the same `createAccountAction` as `/accounts`. `/`
-  redirects here when the signed-in user has 0 active accounts.
-- **Dashboard** (`/`, `src/app/page.tsx` + `src/app/components/dashboard/`): re-structured by plan
-  `dashboard-restructure`. "Saldo actual" = Σ derived balances of ALL active accounts (credit
-  negative). "Saldos" section groups active accounts cash → debit → investment → credit with the
-  branding icon/color; tapping a card opens the contextual capture modal (`EntryModal`); add/edit
-  links to `/accounts`. The former "Patrimonio por tipo" block was replaced by this section.
+- **Onboarding** (`/onboarding`, `src/app/onboarding/`): 5-step guided flow (cash -> bank accounts
+  -> salary/nómina -> fixed expenses -> summary) for a brand-new user (plan
+  `design-system-mobile-kit`). Steps 1-2 call the same `createAccountAction` as `/accounts`; step 3
+  creates an `income_schedule` (`createIncomeScheduleAction`, frequency chips semanal/catorcenal/
+  quincenal/mensual -> weekly/biweekly/semimonthly/monthly, anchor = "fecha de tu próximo pago");
+  step 4 creates `fixed_expense` templates (tipo Servicio/Suscripción resuelve la categoría seed
+  "Servicios"/"Subscripciones" por nombre). `/` redirects here when the signed-in user has 0
+  active accounts.
+- **Dashboard** (`/`, `src/app/page.tsx` + `src/app/components/dashboard/`): estructura del design
+  system (plan `design-system-mobile-kit`): "Saldo actual" (StatDisplay display 34px) → timeline →
+  sección **Cuentas** con `ExpandableRow` por cuenta (últimas 3 transacciones + acciones editar/
+  nueva transacción/ver transacciones) → sección **Presupuestos** (barras expandibles del plan
+  vigente). "Ver transacciones" abre `TransactionsView` (container-transform del encabezado de la
+  fila + filtros: búsqueda difusa, badge cruzado, fecha con `MiniCalendar`, rango de montos). La
+  captura contextual vive en `NewTransactionModal` (morph circular→modal; en crédito el ingreso es
+  Pago = transferencia con atajo liquidar; en inversión hay tab Ajustar); alta/edición de cuentas
+  en `NewAccountModal` y topes en `NewBudgetModal`, todos sobre el shell `MorphModal`.
+  `getDashboardV2` además expone `entriesByAccount`/`entriesByCategory` (historial completo,
+  transferencias en ambas cuentas).
 
 ## Branding
 
+Tokens del proyecto claude.ai/design "Perfin Design System" (plan `design-system-mobile-kit`):
+neutrales charcoal fríos (`neutral-*`; la escala `secondary-*` quedó como alias de compat),
+verde de marca y acentos mustard/purple/indigo intactos, semánticos
+`surface/surface-muted/surface-raised/border/text/text-muted/accent/accent-strong/accent-soft/
+negative` (light + dark vía `prefers-color-scheme` y `[data-theme]`), tipografía **Manrope**
+400/500 (next/font, `--font-manrope`) con escala de 4 roles (caption 13 / body 16 / heading 20 /
+display 34 como utilidades `text-*`), radios sm 6 / md 12 / lg 16, `--control-h`/`--tap-target`
+44px. Alias planos (`--surface`, `--text`, …) en `:root` para los estilos inline portados del kit.
+Marca: escudo verde + palomita ("shield-check", `src/app/components/Logo.tsx` + `src/app/icon.svg`).
+
 `src/lib/branding/account-kind.ts` -- `ACCOUNT_KIND_META`, the single source of truth for the
 kind -> `{label, icon (Iconify mdi:*), textLight/textDark, bgSoft, barClass}` mapping consumed by
-`/accounts`, `/onboarding` and `/`. Colors are drawn from the brand token scale in
-`src/app/globals.css` (`@theme`, Tailwind v4 CSS-first) -- the derivation and WCAG contrast table
-live in the pruned plan `onboarding-dashboard-branding` (git history of `docs/plans/`). Fixed
-mapping, no per-account override exists (confirmed with the `dba` review: purely a design
-decision, not data). `barClass` must stay a literal Tailwind class string (e.g. `"bg-primary-500"`)
--- Tailwind's build-time scanner cannot see runtime-computed class names.
+`/accounts`, `/onboarding` and `/`; `KIND_ACCENT` (`src/app/components/ui/kit.ts`) lo traduce al
+acento del kit (cash=green, debit=indigo, investment=purple, credit=mustard) para `IconBadge`
+(círculo `-100` + glifo `-700`, mismo tratamiento en light y dark). Fixed mapping, no per-account
+override exists (confirmed with the `dba` review: purely a design decision, not data). `barClass`
+must stay a literal Tailwind class string (e.g. `"bg-primary-500"`) -- Tailwind's build-time
+scanner cannot see runtime-computed class names.
 
 ## Dependencies
 
