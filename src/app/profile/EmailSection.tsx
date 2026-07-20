@@ -31,7 +31,7 @@ export function EmailSection({ email, verified }: EmailSectionProps) {
 
   return (
     <section className="rounded-lg border p-6 space-y-3">
-      <p className="text-xs text-gray-500 uppercase tracking-wide">Correo</p>
+      <p className="text-xs text-text-muted uppercase tracking-wide">Correo</p>
 
       {email ? (
         <div className="flex items-center justify-between gap-2">
@@ -47,7 +47,7 @@ export function EmailSection({ email, verified }: EmailSectionProps) {
           )}
         </div>
       ) : (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-text-muted">
           Tu cuenta no tiene correo. Sin correo no puedes recuperar tu contraseña si la
           olvidas.
         </p>
@@ -69,7 +69,7 @@ export function EmailSection({ email, verified }: EmailSectionProps) {
             </button>
           )}
           {verifyState.errors?._form && (
-            <p className="text-red-600 text-xs mt-1">{verifyState.errors._form[0]}</p>
+            <p className="text-negative text-xs mt-1">{verifyState.errors._form[0]}</p>
           )}
         </form>
       )}
@@ -94,11 +94,11 @@ export function EmailSection({ email, verified }: EmailSectionProps) {
               className="mt-1 w-full rounded border px-3 py-2 text-sm"
             />
             {changeState.errors?.email && (
-              <p className="text-red-600 text-xs mt-1">{changeState.errors.email[0]}</p>
+              <p className="text-negative text-xs mt-1">{changeState.errors.email[0]}</p>
             )}
           </div>
           {changeState.errors?._form && (
-            <p className="text-red-600 text-sm">{changeState.errors._form[0]}</p>
+            <p className="text-negative text-sm">{changeState.errors._form[0]}</p>
           )}
           <div className="flex gap-2">
             <button

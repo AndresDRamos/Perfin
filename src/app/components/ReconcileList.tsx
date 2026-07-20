@@ -41,7 +41,7 @@ function ReconcileRow({ projection }: { projection: DueProjection }) {
           <p className="truncate text-sm font-medium">
             {projection.concept ?? "Ingreso proyectado"}
           </p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-text-muted">
             {/* occurred_at se guarda como medianoche UTC del día capturado;
                 formatear en UTC evita mostrar el día anterior en TZ México. */}
             {new Date(projection.occurredAtISO).toLocaleDateString("es-MX", {
@@ -74,7 +74,7 @@ function ReconcileRow({ projection }: { projection: DueProjection }) {
           {pending ? "…" : "Conciliar"}
         </button>
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-negative">{error}</p>}
     </div>
   );
 }

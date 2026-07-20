@@ -18,10 +18,10 @@ export function PasswordInput({ label, name, autoComplete, error, minLength }: P
 
   return (
     <div>
-      <label className="block text-sm font-medium" htmlFor={name}>
+      <label className="mb-1 block text-caption text-text-muted" htmlFor={name}>
         {label}
       </label>
-      <div className="relative mt-1">
+      <div className="relative">
         <input
           id={name}
           name={name}
@@ -29,7 +29,7 @@ export function PasswordInput({ label, name, autoComplete, error, minLength }: P
           required
           minLength={minLength}
           autoComplete={autoComplete}
-          className="w-full rounded border px-3 py-2 pr-12 text-sm"
+          className="h-11 w-full rounded-sm border border-border bg-transparent px-3 pr-12 text-body"
         />
         <button
           type="button"
@@ -37,7 +37,7 @@ export function PasswordInput({ label, name, autoComplete, error, minLength }: P
           onClick={() => setVisible((v) => !v)}
           aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
           aria-pressed={visible}
-          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-400 hover:text-gray-600"
+          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-text-muted hover:text-text"
         >
           {visible ? (
             // eye-off
@@ -56,7 +56,7 @@ export function PasswordInput({ label, name, autoComplete, error, minLength }: P
           )}
         </button>
       </div>
-      {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
+      {error && <p className="mt-1 text-caption text-negative">{error}</p>}
     </div>
   );
 }

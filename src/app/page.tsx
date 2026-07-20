@@ -25,25 +25,22 @@ export default async function Home() {
   return (
     <main className="mx-auto max-w-2xl space-y-6 p-4 sm:p-8 sm:space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className="text-2xl font-semibold">Perfin</h1>
-        <nav className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-primary-700 dark:text-primary-400">
+        <h1 className="text-heading font-medium">Perfin</h1>
+        <nav className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-accent-strong">
           <Link href="/accounts" className="hover:underline">
-            Cuentas →
+            Cuentas
           </Link>
           <Link href="/plans" className="hover:underline">
-            Planes →
+            Planes
           </Link>
           <Link href="/categories" className="hover:underline">
-            Categorías →
+            Categorías
           </Link>
-          <Link href="/profile" className="text-secondary-600 hover:underline dark:text-secondary-300">
+          <Link href="/profile" className="text-text-muted hover:underline">
             {sessionUser.username}
           </Link>
           <form action={logOutAction}>
-            <button
-              type="submit"
-              className="text-secondary-600 hover:underline dark:text-secondary-300"
-            >
+            <button type="submit" className="text-text-muted hover:underline">
               Salir
             </button>
           </form>

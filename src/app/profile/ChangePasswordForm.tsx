@@ -23,7 +23,7 @@ export function ChangePasswordForm() {
 
   return (
     <section className="rounded-lg border p-6 space-y-3">
-      <p className="text-xs text-gray-500 uppercase tracking-wide">Contraseña</p>
+      <p className="text-xs text-text-muted uppercase tracking-wide">Contraseña</p>
 
       {state.ok ? (
         <p className="text-sm text-green-700">Contraseña actualizada.</p>
@@ -50,7 +50,7 @@ export function ChangePasswordForm() {
             error={state.errors?.passwordConfirm?.[0]}
           />
           {state.errors?._form && (
-            <p className="text-red-600 text-sm">{state.errors._form[0]}</p>
+            <p className="text-negative text-sm">{state.errors._form[0]}</p>
           )}
           <div className="flex gap-2">
             <button

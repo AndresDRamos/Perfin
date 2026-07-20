@@ -40,9 +40,13 @@ projected available. Fast capture is the top priority (the user records constant
 ## Public interface
 
 - Capture / edit / reconcile (`projected` -> `cleared`) transactions. The dashboard (`/`) captures
-  contextually per account kind via `EntryModal` (income into cash/debit may be a transfer from
-  another own account; investment offers a balance adjustment entry for the difference; a credit
-  "income" is a payment = transfer, with a "liquidar" shortcut).
+  contextually per account kind via `NewTransactionModal` (morph modal del design system; plan
+  `design-system-mobile-kit`): income into cash/debit may be a transfer from another own account;
+  investment offers an "Ajustar" tab (balance adjustment entry for the difference); a credit
+  "income" is a "Pago" = transfer, with a "liquidar" shortcut. Estado se deriva de la fecha
+  (futura -> `projected`). Detail/edición en sitio vía `TransactionDetailModal` (monto/concepto/
+  fecha/cuenta/categoría -> `editEntry`; proyecciones ofrecen "Confirmar movimiento" ->
+  `reconcileEntry`; sin borrado — no existe acción de delete para entries normales).
 - Income projections: `createProjection` / `reconcileWithAmount(userId, id, realPesos)`
   (`ledger-write.ts`); `listProjections` (`ledger-repo.ts`). Due projections (occurred_at <= today,
   still projected) surface on the dashboard as "Por conciliar" (`ReconcileList`, rendered above

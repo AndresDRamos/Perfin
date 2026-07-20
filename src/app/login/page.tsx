@@ -14,8 +14,8 @@ export default async function LoginPage({
   const noticeText = notice ? NOTICES[notice] : undefined;
 
   return (
-    <main className="mx-auto max-w-sm p-8">
-      <Logo className="mb-6" />
+    <main className="mx-auto max-w-sm p-6 pt-10 sm:p-8">
+      <Logo size={40} className="mb-6 w-full justify-center" />
       {noticeText && (
         <p className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
           {noticeText}

@@ -123,10 +123,31 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   `ReconcileList`/"Por conciliar" y "Patrimonio" de `plan-types-dashboard-neto` se conservan
   arriba del nuevo dashboard (`getDashboard()` sigue viva junto a `getDashboardV2()`);
   `CaptureForm.tsx` quedó reemplazado por `EntryModal`.
+- **Design system móvil** (`design-system-mobile-kit`, complete) -- implementación del proyecto
+  claude.ai/design "Perfin Design System" sobre las funcionalidades existentes (branding-only,
+  cero DDL). Tokens migrados a charcoal frío + Manrope 400/500 + escala tipográfica de 4 roles
+  (`globals.css`; verde de marca y acentos mustard/purple/indigo intactos; `secondary-*` queda
+  como alias de compat de la nueva escala `neutral-*`). Nuevas primitivas en
+  `src/app/components/ui/` (MorphModal container-transform, ModalSelect, MiniCalendar,
+  ExpandableRow, IconBadge, StatDisplay, KindCard, StepDots, Chip). Dashboard re-estructurado:
+  Saldo actual → timeline (línea suave con gradiente, hoy en rojo punteado) → secciones Cuentas
+  y Presupuestos como filas expandibles con últimas 3 transacciones; "Ver transacciones" abre una
+  vista con container-transform del encabezado + filtros (búsqueda difusa, categoría/cuenta,
+  fecha, rango de montos); captura y edición vía modales morph (`NewTransactionModal` --
+  tabs Gasto/Ingreso/Ajustar, `NewAccountModal`, `NewBudgetModal`, `TransactionDetailModal` --
+  edición en sitio incluye origen/destino de transferencias). `getDashboardV2` gana
+  `entriesByAccount`/`entriesByCategory` (historial completo). Onboarding creció de 3 a 5 pasos:
+  los nuevos pasos de nómina y gastos fijos escriben `income_schedule`/`fixed_expense` reales
+  (antes solo se configuraban después, desde `/plans`). Componentes retirados: `EntryModal`,
+  `DayDetail`, `BudgetBars`, `AccountBalanceList`. Marca actualizada a "shield-check" (`Logo`,
+  `icon.svg`). Resto de vistas (`/accounts`, `/plans`, `/categories`, `/profile`) solo
+  re-tematizadas (heredan tokens); rediseño estructural diferido a un plan propio.
 - **Next**: gestión de espacios (crear/invitar/exponer cuentas), marca de cuenta de nómina +
   proyección de próximo ingreso (ver visión en memoria del usuario), configurar "Secure email
   change" OFF + Redirect URLs en el dashboard de Supabase (bloquea la verificación E2E del ciclo
-  de correo del plan `auth-profile-recovery`).
+  de correo del plan `auth-profile-recovery`), rediseño estructural de `/accounts`/`/plans`/
+  `/categories`/`/profile` con los patrones del design system (diferido por decisión 3 del plan
+  `design-system-mobile-kit`).
 
 ## Active risks
 
@@ -139,10 +160,6 @@ Active context of the repo. Curated by `/commit-plan`. Keep it short: only what 
   cambiar el motor a projected+confirm es un flag (`status` en `materializeDueFixedExpenses`).
 - **Savings tracking is manual**: `savings_reservation` budgets only track transfers the user
   records into the destination account; there is no automatic money movement or enforcement.
-- **Auditoría de contraste dark-mode pendiente en catalog/captura**: `PlanList.tsx` y
-  `BudgetManager.tsx` quedaron corregidos por el plan `plan-types-dashboard-neto`;
-  `CategoryList.tsx` y `CaptureForm.tsx` siguen sin revisarse -- hacerlo en el próximo plan que
-  los toque.
 - **Fechas a medianoche UTC se muestran un día antes en TZ México**: convención heredada de
   `z.coerce.date` sobre inputs `type=date`. La UI nueva (proyecciones) formatea con
   `timeZone: "UTC"`; pantallas previas (p. ej. "Vence {fecha}" de tarjetas en el dashboard) aún

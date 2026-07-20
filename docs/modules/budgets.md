@@ -33,12 +33,15 @@ Optional planning layer. A **plan** holds budgets, always tied to the available 
 
 ## Dashboard surface
 
-The dashboard (`/`, `BudgetBars`) shows the `category_cap` budgets of the plan whose period covers
-today, sorted by % of real spend (desc). Tapping a category expands its period transactions and
-offers capture with the category prefilled or scheduling a future `projected` expense; a light
-inline "new expense category" input reuses the catalog action (full CRUD stays in `/categories`).
-No current plan → CTA to `/plans`. The remaining cap also feeds the balance-timeline projection
-(linear burn — see `ledger.md`).
+The dashboard (`/`, sección "Presupuestos", plan `design-system-mobile-kit`) shows the
+`category_cap` budgets of the plan whose period covers today as expandable bars (`ExpandableRow`
+variante budget, % dentro de la barra, roja al exceder), sorted by % of real spend (desc).
+Expandir muestra las últimas 3 transacciones del periodo y acciones: editar tope
+(`NewBudgetModal`, también crea el tope y — si hace falta — la categoría vía el catálogo),
+nueva transacción con la categoría fija (`NewTransactionModal`) y "Ver transacciones"
+(`TransactionsView` con la barra de progreso como encabezado morph y filtros). Full CRUD stays in
+`/plans/[id]` and `/categories`. No current plan → CTA to `/plans`. The remaining cap also feeds
+the balance-timeline projection (linear burn — see `ledger.md`).
 
 ## Dependencies
 

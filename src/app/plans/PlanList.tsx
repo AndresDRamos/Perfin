@@ -135,7 +135,7 @@ function BudgetPlanForm({ onBack }: { onBack: () => void }) {
           className="h-11 w-full rounded border px-3 text-sm"
         />
         {state.errors?.name && (
-          <p className="text-red-600 text-xs mt-0.5">{state.errors.name[0]}</p>
+          <p className="text-negative text-xs mt-0.5">{state.errors.name[0]}</p>
         )}
       </div>
       <label className="flex min-h-11 items-center gap-2 text-sm">
@@ -170,7 +170,7 @@ function BudgetPlanForm({ onBack }: { onBack: () => void }) {
         )}
       </div>
       {state.errors?.periodEnd && (
-        <p className="text-red-600 text-xs">{state.errors.periodEnd[0]}</p>
+        <p className="text-negative text-xs">{state.errors.periodEnd[0]}</p>
       )}
       <button
         type="submit"
@@ -238,7 +238,7 @@ function ProjectionForm({
         </label>
       </div>
       {state.errors?.amountPesos && (
-        <p className="text-red-600 text-xs">{state.errors.amountPesos[0]}</p>
+        <p className="text-negative text-xs">{state.errors.amountPesos[0]}</p>
       )}
       <div>
         <select
@@ -254,7 +254,7 @@ function ProjectionForm({
           ))}
         </select>
         {state.errors?.accountId && (
-          <p className="text-red-600 text-xs mt-0.5">{state.errors.accountId[0]}</p>
+          <p className="text-negative text-xs mt-0.5">{state.errors.accountId[0]}</p>
         )}
       </div>
       <button
@@ -311,7 +311,7 @@ function FixedExpenseForm({
           className="h-11 w-full rounded border px-3 text-sm"
         />
         {state.errors?.name && (
-          <p className="text-red-600 text-xs mt-0.5">{state.errors.name[0]}</p>
+          <p className="text-negative text-xs mt-0.5">{state.errors.name[0]}</p>
         )}
       </div>
       <div className="flex gap-2">
@@ -343,7 +343,7 @@ function FixedExpenseForm({
         </label>
       </div>
       {state.errors?.dayOfMonth && (
-        <p className="text-red-600 text-xs">{state.errors.dayOfMonth[0]}</p>
+        <p className="text-negative text-xs">{state.errors.dayOfMonth[0]}</p>
       )}
       <div>
         <select name="accountId" required className="h-11 w-full rounded border px-3 text-sm">
@@ -369,7 +369,7 @@ function FixedExpenseForm({
           ))}
         </select>
         {state.errors?.expenseCategoryId && (
-          <p className="text-red-600 text-xs mt-0.5">{state.errors.expenseCategoryId[0]}</p>
+          <p className="text-negative text-xs mt-0.5">{state.errors.expenseCategoryId[0]}</p>
         )}
       </div>
       <div className="flex gap-2">
@@ -392,7 +392,7 @@ function FixedExpenseForm({
         </label>
       </div>
       {state.errors?.endDate && (
-        <p className="text-red-600 text-xs">{state.errors.endDate[0]}</p>
+        <p className="text-negative text-xs">{state.errors.endDate[0]}</p>
       )}
       <button
         type="submit"
@@ -485,7 +485,7 @@ function ProjectionRowItem({ p }: { p: ProjectionView }) {
                   className={
                     diff > 0
                       ? "ml-1 text-primary-700 dark:text-primary-300"
-                      : "ml-1 text-red-600 dark:text-red-400"
+                      : "ml-1 text-negative dark:text-red-400"
                   }
                 >
                   ({diff > 0 ? "+" : ""}

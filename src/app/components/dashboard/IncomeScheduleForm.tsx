@@ -147,7 +147,7 @@ function ScheduleFields({
           className={inputClass}
           placeholder="Nómina, freelance…"
         />
-        {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name[0]}</p>}
+        {errors.name && <p className="mt-1 text-xs text-negative">{errors.name[0]}</p>}
       </div>
 
       <div>
@@ -181,7 +181,7 @@ function ScheduleFields({
           Es un estimado: el día de pago la app te preguntará cuánto recibiste realmente.
         </p>
         {errors.estimatedAmountPesos && (
-          <p className="mt-1 text-xs text-red-600">{errors.estimatedAmountPesos[0]}</p>
+          <p className="mt-1 text-xs text-negative">{errors.estimatedAmountPesos[0]}</p>
         )}
       </div>
 
@@ -199,7 +199,7 @@ function ScheduleFields({
             </option>
           ))}
         </select>
-        {errors.accountId && <p className="mt-1 text-xs text-red-600">{errors.accountId[0]}</p>}
+        {errors.accountId && <p className="mt-1 text-xs text-negative">{errors.accountId[0]}</p>}
       </div>
 
       {incomeCategories.length > 0 && (
@@ -231,7 +231,7 @@ function ScheduleFields({
         <p className="mt-1 text-xs text-secondary-600 dark:text-secondary-300">
           A partir de esta fecha se calculan tus próximos pagos.
         </p>
-        {errors.anchorDate && <p className="mt-1 text-xs text-red-600">{errors.anchorDate[0]}</p>}
+        {errors.anchorDate && <p className="mt-1 text-xs text-negative">{errors.anchorDate[0]}</p>}
       </div>
 
       <div className="flex gap-2">
@@ -251,7 +251,7 @@ function ScheduleFields({
           type="button"
           onClick={deactivate}
           disabled={pending}
-          className="w-full rounded py-2 text-sm text-red-600 underline"
+          className="w-full rounded py-2 text-sm text-negative underline"
         >
           Desactivar este ingreso
         </button>

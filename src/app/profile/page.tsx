@@ -37,9 +37,9 @@ export default async function ProfilePage({
       )}
 
       <section className="rounded-lg border p-6 space-y-1">
-        <p className="text-xs text-gray-500 uppercase tracking-wide">Usuario</p>
+        <p className="text-xs text-text-muted uppercase tracking-wide">Usuario</p>
         <p className="text-lg font-medium">{sessionUser.username}</p>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-text-muted">
           Tu nombre visible en Perfin. No se puede cambiar.
         </p>
       </section>
@@ -54,7 +54,7 @@ export default async function ProfilePage({
       <form action={logOutAction}>
         <button
           type="submit"
-          className="w-full rounded border border-red-200 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
+          className="w-full rounded border border-red-200 py-2.5 text-sm font-medium text-negative hover:bg-red-50"
         >
           Cerrar sesión
         </button>

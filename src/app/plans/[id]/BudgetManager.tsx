@@ -71,7 +71,7 @@ function BudgetCard({
             {SUBTYPE_LABELS[b.subtype]}
           </span>
           {b.subtype === "purchase_goal" && b.horizon && (
-            <span className="ml-1 text-xs text-gray-400">{HORIZON_LABELS[b.horizon]}</span>
+            <span className="ml-1 text-xs text-text-muted">{HORIZON_LABELS[b.horizon]}</span>
           )}
         </div>
         <button
@@ -99,7 +99,7 @@ function BudgetCard({
             <span>
               {pesos(item.realActual)}
               {item.projectedActual !== item.realActual && (
-                <span className="text-gray-400"> (proy. {pesos(item.projectedActual)})</span>
+                <span className="text-text-muted"> (proy. {pesos(item.projectedActual)})</span>
               )}
             </span>
             <span>de {pesos(target)}</span>
@@ -112,7 +112,7 @@ function BudgetCard({
       )}
 
       {b.periodStart && b.periodEnd && (
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-text-muted">
           Periodo propio: {b.periodStart} → {b.periodEnd}
         </p>
       )}
@@ -184,7 +184,7 @@ function NewBudgetForm({ planId, expenseCategories, accounts }: Props) {
             ))}
           </select>
           {state.errors?.expenseCategoryId && (
-            <p className="text-red-600 text-xs mt-0.5">{state.errors.expenseCategoryId[0]}</p>
+            <p className="text-negative text-xs mt-0.5">{state.errors.expenseCategoryId[0]}</p>
           )}
         </div>
       )}
@@ -204,7 +204,7 @@ function NewBudgetForm({ planId, expenseCategories, accounts }: Props) {
             ))}
           </select>
           {state.errors?.accountId && (
-            <p className="text-red-600 text-xs mt-0.5">{state.errors.accountId[0]}</p>
+            <p className="text-negative text-xs mt-0.5">{state.errors.accountId[0]}</p>
           )}
         </div>
       )}
@@ -238,7 +238,7 @@ function NewBudgetForm({ planId, expenseCategories, accounts }: Props) {
           className="w-full rounded border px-3 py-1.5 text-sm"
         />
         {state.errors?.targetAmountPesos && (
-          <p className="text-red-600 text-xs mt-0.5">{state.errors.targetAmountPesos[0]}</p>
+          <p className="text-negative text-xs mt-0.5">{state.errors.targetAmountPesos[0]}</p>
         )}
       </div>
 
@@ -249,7 +249,7 @@ function NewBudgetForm({ planId, expenseCategories, accounts }: Props) {
           <input name="periodEnd" type="date" className="flex-1 rounded border px-3 py-1.5" />
         </div>
         {state.errors?.periodEnd && (
-          <p className="text-red-600 text-xs mt-0.5">{state.errors.periodEnd[0]}</p>
+          <p className="text-negative text-xs mt-0.5">{state.errors.periodEnd[0]}</p>
         )}
       </details>
 
@@ -276,7 +276,7 @@ export function BudgetManager(props: Props) {
     <div className="space-y-6">
       <div className="space-y-2">
         {progress.length === 0 && (
-          <p className="text-sm text-gray-400">Sin presupuestos todavía.</p>
+          <p className="text-sm text-text-muted">Sin presupuestos todavía.</p>
         )}
         {progress.map((item) => (
           <BudgetCard key={item.budget.id} planId={planId} item={item} names={names} />

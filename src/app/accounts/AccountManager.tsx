@@ -58,7 +58,7 @@ function expirationMonthValue(date: string | null) {
 
 function FieldError({ errors }: { errors?: string[] }) {
   if (!errors?.length) return null;
-  return <p className="text-red-600 text-xs mt-0.5">{errors[0]}</p>;
+  return <p className="text-negative text-xs mt-0.5">{errors[0]}</p>;
 }
 
 // ─── shared conditional fields (bank / number / expiration / credit config) ─────
@@ -79,7 +79,7 @@ function MetadataFields({
     <>
       {BANK_KINDS.includes(kind) && (
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">Banco / institución</label>
+          <label className="block text-xs text-text-muted mb-0.5">Banco / institución</label>
           <input
             name="bank"
             type="text"
@@ -92,7 +92,7 @@ function MetadataFields({
       )}
       {BANK_KINDS.includes(kind) && (
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">
+          <label className="block text-xs text-text-muted mb-0.5">
             Número (enmascarado, p.ej. ****1234)
           </label>
           <input
@@ -107,7 +107,7 @@ function MetadataFields({
       )}
       {CARD_KINDS.includes(kind) && (
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">Vigencia (MM/AA)</label>
+          <label className="block text-xs text-text-muted mb-0.5">Vigencia (MM/AA)</label>
           <input
             name="expirationMonth"
             type="month"
@@ -120,7 +120,7 @@ function MetadataFields({
       {kind === "credit" && (
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs text-gray-500 mb-0.5">Día de corte</label>
+            <label className="block text-xs text-text-muted mb-0.5">Día de corte</label>
             <input
               name="cutoffDay"
               type="number"
@@ -133,7 +133,7 @@ function MetadataFields({
             <FieldError errors={errors?.cutoffDay} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-0.5">Día de pago</label>
+            <label className="block text-xs text-text-muted mb-0.5">Día de pago</label>
             <input
               name="paymentDay"
               type="number"
@@ -146,7 +146,7 @@ function MetadataFields({
             <FieldError errors={errors?.paymentDay} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-0.5">Límite (MXN)</label>
+            <label className="block text-xs text-text-muted mb-0.5">Límite (MXN)</label>
             <input
               name="creditLimitPesos"
               type="number"
@@ -200,7 +200,7 @@ function NewAccountForm() {
       <h3 className="font-medium text-sm">Nueva cuenta</h3>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">Nombre</label>
+          <label className="block text-xs text-text-muted mb-0.5">Nombre</label>
           <input
             name="name"
             type="text"
@@ -212,7 +212,7 @@ function NewAccountForm() {
           <FieldError errors={state.errors?.name} />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">Tipo</label>
+          <label className="block text-xs text-text-muted mb-0.5">Tipo</label>
           <select
             value={kind}
             onChange={(e) => setKind(e.target.value as Kind)}
@@ -227,7 +227,7 @@ function NewAccountForm() {
         </div>
       </div>
       <div>
-        <label className="block text-xs text-gray-500 mb-0.5">
+        <label className="block text-xs text-text-muted mb-0.5">
           {kind === "credit"
             ? "Deuda actual (MXN, si aplica) — fija después de crear"
             : "Saldo inicial (MXN) — fijo después de crear"}
@@ -284,7 +284,7 @@ function EditAccountForm({ account, onClose }: { account: Account; onClose: () =
   return (
     <form key={state.attempt ?? 0} action={action} className="space-y-3 mt-3 border-t pt-3">
       <div>
-        <label className="block text-xs text-gray-500 mb-0.5">Nombre</label>
+        <label className="block text-xs text-text-muted mb-0.5">Nombre</label>
         <input
           name="name"
           type="text"
@@ -363,15 +363,15 @@ function AccountCard({ view }: { view: AccountView }) {
                 {KIND_LABELS[account.kind]}
               </span>
               {!account.isActive && (
-                <span className="ml-1 text-xs text-gray-400">(inactiva)</span>
+                <span className="ml-1 text-xs text-text-muted">(inactiva)</span>
               )}
             </p>
-            {meta && <p className="text-xs text-gray-400 truncate">{meta}</p>}
+            {meta && <p className="text-xs text-text-muted truncate">{meta}</p>}
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <p
-            className={`font-semibold text-sm ${balancePesos < 0 ? "text-red-600" : ""}`}
+            className={`font-semibold text-sm ${balancePesos < 0 ? "text-negative" : ""}`}
             title="Saldo derivado: inicial + movimientos confirmados"
           >
             {formatMXN(balancePesos)}
@@ -389,7 +389,7 @@ function AccountCard({ view }: { view: AccountView }) {
                   await deactivateAccountAction(account.id);
                 })
               }
-              className="text-xs text-gray-500 hover:underline"
+              className="text-xs text-text-muted hover:underline"
             >
               Desactivar
             </button>
@@ -426,12 +426,12 @@ export function AccountManager({ accounts }: { accounts: AccountView[] }) {
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-lg">Cuentas líquidas</h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-text-muted">
             Total activas: <span className="font-semibold">{formatMXN(liquidTotal)}</span>
           </p>
         </div>
         {liquid.length === 0 && (
-          <p className="text-sm text-gray-400">Sin cuentas líquidas todavía.</p>
+          <p className="text-sm text-text-muted">Sin cuentas líquidas todavía.</p>
         )}
         {liquid.map((v) => (
           <AccountCard key={v.account.id} view={v} />
@@ -441,7 +441,7 @@ export function AccountManager({ accounts }: { accounts: AccountView[] }) {
       <section className="space-y-2">
         <h2 className="font-semibold text-lg">Crédito</h2>
         {credit.length === 0 && (
-          <p className="text-sm text-gray-400">Sin tarjetas de crédito registradas.</p>
+          <p className="text-sm text-text-muted">Sin tarjetas de crédito registradas.</p>
         )}
         {credit.map((v) => (
           <AccountCard key={v.account.id} view={v} />

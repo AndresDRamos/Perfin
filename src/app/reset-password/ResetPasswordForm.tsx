@@ -27,7 +27,7 @@ export function ResetPasswordForm() {
     <form action={action} className="space-y-4 rounded-lg border p-6">
       <div>
         <h2 className="font-medium">Nueva contraseña</h2>
-        <p className="text-sm text-gray-500 mt-1">Elige tu nueva contraseña.</p>
+        <p className="text-sm text-text-muted mt-1">Elige tu nueva contraseña.</p>
       </div>
 
       <PasswordInput
@@ -47,7 +47,7 @@ export function ResetPasswordForm() {
       />
 
       {state.errors?._form && (
-        <p className="text-red-600 text-sm">{state.errors._form[0]}</p>
+        <p className="text-negative text-sm">{state.errors._form[0]}</p>
       )}
 
       <button
@@ -58,7 +58,7 @@ export function ResetPasswordForm() {
         {pending ? "Guardando…" : "Guardar contraseña"}
       </button>
 
-      <p className="text-center text-sm text-gray-500">
+      <p className="text-center text-sm text-text-muted">
         <Link href="/forgot-password" className="text-primary-700 hover:underline dark:text-primary-400">
           Solicitar un enlace nuevo
         </Link>

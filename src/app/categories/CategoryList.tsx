@@ -51,7 +51,7 @@ function NewCategoryForm({ type }: { type: "income" | "expense" }) {
           className="w-full rounded border px-3 py-1.5 text-sm"
         />
         {state.errors?.name && (
-          <p className="text-red-600 text-xs mt-0.5">{state.errors.name[0]}</p>
+          <p className="text-negative text-xs mt-0.5">{state.errors.name[0]}</p>
         )}
       </div>
       <button
@@ -97,7 +97,7 @@ function CategoryRow({
           </span>
         )}
         {!row.isActive && (
-          <span className="ml-2 text-xs text-gray-400">inactiva</span>
+          <span className="ml-2 text-xs text-text-muted">inactiva</span>
         )}
       </div>
       {row.isActive && !isSavingsRow && (
@@ -123,7 +123,7 @@ export function CategoryList({ incomeCategories, expenseCategories }: Props) {
         <h2 className="font-semibold text-base mb-2">Ingresos</h2>
         <div className="space-y-1.5">
           {incomeCategories.length === 0 && (
-            <p className="text-sm text-gray-400">Sin categorías todavía.</p>
+            <p className="text-sm text-text-muted">Sin categorías todavía.</p>
           )}
           {incomeCategories.map((c) => (
             <CategoryRow key={c.id} row={c} type="income" />
@@ -137,7 +137,7 @@ export function CategoryList({ incomeCategories, expenseCategories }: Props) {
         <h2 className="font-semibold text-base mb-2">Gastos</h2>
         <div className="space-y-1.5">
           {expenseCategories.length === 0 && (
-            <p className="text-sm text-gray-400">Sin categorías todavía.</p>
+            <p className="text-sm text-text-muted">Sin categorías todavía.</p>
           )}
           {expenseCategories.map((c) => (
             <CategoryRow key={c.id} row={c} type="expense" />
